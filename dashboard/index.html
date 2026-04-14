@@ -1,0 +1,2827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NetworkLite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Barlow:wght@300;400;500;600&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ VARS */
+:root{
+  --bg:#07080e;--surface:#0d1220;--surface2:#121a2a;--surface3:#17213a;
+  --border:#1c2d47;--border2:#28405e;
+  --amber:#f0a030;--amber-glow:rgba(240,160,48,.18);--amber-dim:#6b4710;
+  --teal:#18d8b0;--teal-glow:rgba(24,216,176,.14);--teal-dim:#0a5040;
+  --blue:#4a90f5;--pink:#d050c8;--red:#e84040;--green:#40c878;
+  --text:#8aaec8;--text-bright:#cce0f8;--text-dim:#3a5472;
+  --mono:'Fira Code',monospace;--sans:'Barlow',sans-serif;--display:'Orbitron',sans-serif;
+  --node-source:#18d8b0;--node-cstr:#f0a030;--node-sink:#40c878;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ HEADER */
+.hdr{height:46px;background:var(--surface);border-bottom:1px solid var(--border);
+     display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:10}
+.logo{font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:5px;
+      color:var(--amber);text-transform:uppercase;white-space:nowrap}
+.logo em{color:var(--teal);font-style:normal}
+.logo span{color:var(--text-dim);font-size:9px;letter-spacing:2px;margin-left:6px;vertical-align:middle}
+.hdr-sep{flex:1}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);transition:background .3s,box-shadow .3s;flex-shrink:0}
+.dot.ok{background:var(--green);box-shadow:0 0 7px var(--green)}
+.dot.run{background:var(--amber);box-shadow:0 0 7px var(--amber);animation:pulse 1s ease infinite}
+.dot.err{background:var(--red);box-shadow:0 0 7px var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.status-txt{font-family:var(--mono);font-size:10px;color:var(--text-dim);min-width:90px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BUTTONS */
+.btn{height:27px;padding:0 11px;border:1px solid var(--border2);background:var(--surface2);
+     color:var(--text);font-family:var(--sans);font-size:11px;font-weight:500;
+     cursor:pointer;border-radius:3px;transition:all .13s;display:inline-flex;
+     align-items:center;gap:5px;white-space:nowrap;letter-spacing:.3px}
+.btn:hover{border-color:var(--border2);background:var(--border);color:var(--text-bright)}
+.btn:disabled{opacity:.35;pointer-events:none}
+.btn.pri{background:var(--amber);border-color:var(--amber);color:#000;font-weight:600}
+.btn.pri:hover{background:#f8b848}
+.btn.teal{background:transparent;border-color:var(--teal);color:var(--teal)}
+.btn.teal:hover{background:var(--teal-glow)}
+.btn.danger{background:transparent;border-color:var(--red);color:var(--red)}
+.btn.danger:hover{background:rgba(232,64,64,.1)}
+.btn.sm{height:22px;padding:0 8px;font-size:10px}
+.btn.icon{width:27px;padding:0;justify-content:center;font-size:13px;font-family:var(--mono)}
+.btn.icon.active{background:var(--amber-glow);border-color:var(--amber);color:var(--amber)}
+.xbtn{width:16px;height:16px;border:none;background:transparent;color:var(--text-dim);
+      cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;
+      font-size:14px;line-height:1;flex-shrink:0;padding:0;font-family:var(--mono)}
+.xbtn:hover{color:var(--red);background:rgba(232,64,64,.12)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ MAIN */
+.main{flex:1;display:flex;min-height:0}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ COLUMNS */
+.left{width:240px;flex-shrink:0;border-right:1px solid var(--border);
+      display:flex;flex-direction:column;overflow:hidden}
+.center{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.right{width:256px;flex-shrink:0;border-left:1px solid var(--border);
+       display:flex;flex-direction:column;overflow:hidden}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PANEL */
+.sec{border-bottom:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.sec-hdr{height:30px;background:var(--surface);border-bottom:1px solid var(--border);
+         display:flex;align-items:center;padding:0 10px;gap:8px;flex-shrink:0}
+.sec-title{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:2px;
+           text-transform:uppercase;color:var(--text-dim);flex:1}
+.sec-body{padding:7px;overflow-y:auto}
+.sec-body.flex{display:flex;flex-direction:column;gap:5px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ FORMS */
+.fi{background:var(--surface);border:1px solid var(--border2);border-radius:3px;
+    color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:3px 7px;
+    outline:none;width:100%}
+.fi:focus{border-color:var(--amber)}
+.fi.teal:focus{border-color:var(--teal)}
+.fr{display:flex;align-items:center;gap:6px}
+.fl{font-size:10px;color:var(--text-dim);width:64px;flex-shrink:0;font-family:var(--mono)}
+.fa{display:flex;justify-content:flex-end;gap:5px;margin-top:4px}
+.add-toggle{display:flex;align-items:center;gap:4px;color:var(--text-dim);
+            font-size:11px;cursor:pointer;padding:4px 0;font-family:var(--mono)}
+.add-toggle:hover{color:var(--teal)}
+.add-toggle .plus{color:var(--teal);font-size:16px;line-height:1}
+.add-form-wrap{display:none;margin-top:5px}
+.add-form-wrap.open{display:block}
+.add-form{background:var(--surface2);border:1px solid var(--border2);border-radius:4px;
+          padding:8px;display:flex;flex-direction:column;gap:5px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PALETTE */
+.palette{display:flex;flex-direction:column;gap:5px;padding:8px}
+.pal-item{display:flex;align-items:center;gap:9px;padding:7px 10px;
+          background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+          cursor:grab;transition:border-color .13s,background .13s;user-select:none}
+.pal-item:hover{border-color:var(--border2);background:var(--surface3)}
+.pal-item:active{cursor:grabbing}
+.pal-icon{width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pal-label{display:flex;flex-direction:column;gap:1px}
+.pal-name{font-family:var(--mono);font-size:11px;color:var(--text-bright);font-weight:500}
+.pal-desc{font-size:10px;color:var(--text-dim)}
+.pal-add{margin-left:auto;flex-shrink:0}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TREE */
+.tree-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:3px;
+           cursor:pointer;transition:background .1s;border:1px solid transparent}
+.tree-item:hover{background:var(--surface2)}
+.tree-item.selected{background:var(--surface3);border-color:var(--border2)}
+.tree-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tree-name{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-type{font-size:9px;color:var(--text-dim);font-family:var(--mono)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ WORKSPACE */
+.ws{flex:1;position:relative;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 50%,#090f1d 0%,var(--bg) 80%)}
+#ws-svg{width:100%;height:100%;display:block;shape-rendering:crispEdges}
+.ws-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+         font-family:var(--mono);font-size:9px;color:var(--text-dim);
+         background:var(--surface);border:1px solid var(--border);border-radius:3px;
+         padding:3px 10px;pointer-events:none;letter-spacing:.5px}
+.ws-crosshair{cursor:crosshair}
+
+/* Validation bar */
+.val-bar{height:26px;background:var(--surface);border-top:1px solid var(--border);
+         display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+.val-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.val-txt{font-family:var(--mono);font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.val-ok{color:var(--green)}
+.val-warn{color:var(--amber)}
+.val-err{color:var(--red)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CONTEXT PANEL */
+.ctx-none{padding:20px 12px;text-align:center;color:var(--text-dim);
+          font-family:var(--mono);font-size:11px;line-height:1.7}
+.ctx-section{padding:8px 10px;border-bottom:1px solid var(--border)}
+.ctx-label{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+           color:var(--text-dim);margin-bottom:4px}
+.ctx-value{font-family:var(--mono);font-size:12px;color:var(--text-bright)}
+.ctx-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ctx-stat{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:5px 8px}
+.ctx-stat-label{font-size:9px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.5px}
+.ctx-stat-value{font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:500}
+.ctx-stat-value.teal{color:var(--teal)}
+.ctx-stat-value.green{color:var(--green)}
+
+/* Result list */
+.res-table{width:100%;font-family:var(--mono);font-size:10px;border-collapse:collapse}
+.res-table th{color:var(--text-dim);text-align:left;padding:2px 5px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.5px}
+.res-table td{padding:3px 5px;color:var(--text)}
+.res-table tr:hover td{background:var(--surface2)}
+.sp-badge{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ MODALS */
+.modal-overlay{position:fixed;inset:0;background:rgba(4,6,12,.85);
+               display:flex;align-items:center;justify-content:center;z-index:200;
+               backdrop-filter:blur(2px);display:none}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:6px;
+       display:flex;flex-direction:column;box-shadow:0 16px 64px rgba(0,0,0,.6);
+       max-height:92vh;overflow:hidden}
+.modal-hdr{height:42px;border-bottom:1px solid var(--border);display:flex;
+           align-items:center;padding:0 14px;gap:10px;flex-shrink:0}
+.modal-title{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:3px;
+             color:var(--amber);text-transform:uppercase}
+.modal-close{margin-left:auto;width:24px;height:24px;border:1px solid var(--border);
+             background:transparent;color:var(--text);cursor:pointer;border-radius:3px;
+             font-family:var(--mono);font-size:14px;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+.modal-body{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{flex:1;height:30px;background:transparent;border:none;border-right:1px solid var(--border);
+     color:var(--text-dim);font-family:var(--mono);font-size:9px;letter-spacing:1px;
+     cursor:pointer;transition:all .13s;text-transform:uppercase}
+.tab:last-child{border-right:none}
+.tab.active{background:var(--surface2);color:var(--amber);border-bottom:2px solid var(--amber)}
+.tab:hover:not(.active){color:var(--text);background:var(--surface2)}
+.tab-body{display:none;flex:1;overflow-y:auto}
+.tab-body.active{display:block}
+
+/* Canvas blocks */
+.canvas-block{padding:8px;border-bottom:1px solid var(--border)}
+canvas.plot-canvas{display:block;width:100%;border:1px solid var(--border);border-radius:3px}
+
+/* Timeline scrubber */
+.tl{height:50px;background:var(--surface);border-top:1px solid var(--border);
+    display:flex;flex-direction:column;flex-shrink:0}
+.tl-ctrl{height:24px;display:flex;align-items:center;padding:0 10px;gap:6px;border-bottom:1px solid var(--border)}
+.tl-sep{flex:1}
+.t-disp{font-family:var(--mono);font-size:11px;color:var(--amber);min-width:80px;text-align:right}
+.spd-sel{background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+         color:var(--text);font-family:var(--mono);font-size:10px;padding:2px 4px;outline:none}
+.tl-scrub{height:26px;display:flex;align-items:center;padding:0 10px;gap:8px}
+.tl-lbl{font-family:var(--mono);font-size:9px;color:var(--text-dim);min-width:20px}
+.rail{flex:1;height:4px;background:var(--surface3);border:1px solid var(--border);
+      border-radius:2px;position:relative;cursor:pointer}
+.rail-fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--teal));
+           border-radius:2px;pointer-events:none}
+.thumb{position:absolute;top:50%;transform:translate(-50%,-50%);width:11px;height:11px;
+       background:var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amber);cursor:grab}
+.thumb:active{cursor:grabbing}
+
+/* Temperature editor canvas */
+.tcanvas-wrap{padding:6px 8px;border-bottom:1px solid var(--border)}
+canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--border);border-radius:2px}
+
+/* Hydraulics table */
+.hyd-table{width:100%;font-family:var(--mono);font-size:10px;border-collapse:collapse;padding:0}
+.hyd-table th{background:var(--surface2);color:var(--text-dim);text-align:left;
+              padding:4px 8px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.5px}
+.hyd-table td{padding:4px 8px;border-bottom:1px solid var(--border)}
+.hyd-table td.val{color:var(--amber);font-weight:500}
+.hyd-table td.good{color:var(--green)}
+.hyd-table td.warn{color:var(--red)}
+
+/* Optimizer */
+.obj-row,.dv-row{display:flex;align-items:center;gap:6px;padding:4px 8px;
+                 background:var(--surface2);border:1px solid var(--border);
+                 border-radius:3px;margin-bottom:4px}
+.obj-label,.dv-label{font-family:var(--mono);font-size:11px;color:var(--text-bright);flex:1}
+.obj-dir,.dv-type{font-size:10px;color:var(--text-dim);font-family:var(--mono)}
+
+/* Help */
+.help-body{padding:16px 18px;overflow-y:auto;flex:1}
+.help-body h1,.help-body h2,.help-body h3{font-family:var(--display);letter-spacing:2px;
+  color:var(--amber);font-size:13px;margin:16px 0 8px;text-transform:uppercase}
+.help-body h1{font-size:15px;color:var(--teal)}
+.help-body p{color:var(--text);line-height:1.65;margin-bottom:8px}
+.help-body code{font-family:var(--mono);font-size:11px;background:var(--surface2);
+  border:1px solid var(--border);padding:1px 5px;border-radius:2px;color:var(--teal)}
+.help-body pre{background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+  padding:10px;overflow-x:auto;margin-bottom:10px}
+.help-body pre code{background:none;border:none;padding:0;color:var(--text-bright)}
+.help-body table{border-collapse:collapse;width:100%;margin-bottom:10px;font-size:12px}
+.help-body th{background:var(--surface2);color:var(--text-dim);padding:4px 8px;
+  border:1px solid var(--border);text-align:left;font-family:var(--mono);font-size:10px}
+.help-body td{padding:4px 8px;border:1px solid var(--border);color:var(--text)}
+.help-body hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+.help-body li{color:var(--text);line-height:1.55;margin-left:16px;margin-bottom:3px}
+.help-body strong{color:var(--text-bright)}
+
+/* Mass balance panel */
+.mb-section{padding:8px 10px;border-bottom:1px solid var(--border)}
+.mb-title{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.mb-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:2px 0}
+.mb-row .sp{color:var(--text-bright)}
+.mb-row .num-in{color:var(--teal)}
+.mb-row .num-out{color:var(--amber)}
+
+/* Toast */
+.toast{position:fixed;bottom:60px;right:16px;background:var(--surface2);
+       border:1px solid var(--border2);border-radius:4px;padding:7px 14px;
+       font-family:var(--mono);font-size:11px;color:var(--text-bright);z-index:999;
+       animation:slideIn .2s ease;pointer-events:none}
+@keyframes slideIn{from{transform:translateX(12px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* SVG workspace elements */
+.ws-edge{stroke:var(--border2);stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+.ws-edge.selected{stroke:var(--amber);stroke-width:2}
+.ws-edge.drawing{stroke:var(--teal);stroke-width:1.5;stroke-dasharray:4 3}
+.ws-node-ring{fill:none;stroke-width:1.5}
+.ws-node-bg{opacity:.85}
+.ws-label{font-family:Fira Code,monospace;font-size:10px;text-anchor:middle;
+          dominant-baseline:middle;fill:var(--text-bright);pointer-events:none}
+.ws-label-sub{font-size:8.5px;fill:var(--text-dim)}
+.ws-port{fill:var(--bg);stroke-width:1;cursor:crosshair;transition:r .1s}
+.ws-marquee{fill:rgba(24,216,176,.06);stroke:var(--teal);stroke-width:1;stroke-dasharray:3 3}
+/* Run-dry error state */
+.node-error .ws-node-bg{stroke:var(--red)!important;fill:rgba(232,64,64,.12)!important}
+.node-error .ws-label{fill:var(--red)!important}
+/* Fix proposal modal */
+.fix-proposal{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:6px}
+.fix-proposal.priority-1{border-color:var(--teal)}
+.fix-proposal.priority-0{border-color:var(--red);background:rgba(232,64,64,.07)}
+.fix-priority{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.fix-desc{font-family:var(--sans);font-size:11px;color:var(--text);line-height:1.5;margin-bottom:5px}
+.fix-value{font-family:var(--mono);font-size:11px;color:var(--amber)}
+</style>
+</head>
+<body>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ HEADER -->
+<div class="hdr">
+  <div class="logo">NETWORK<em>LITE</em><span>v2.0</span></div>
+  <div class="dot" id="sdot"></div>
+  <div class="status-txt" id="stxt">Ready</div>
+  <div style="width:1px;height:18px;background:var(--border);margin:0 6px"></div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">ENERGY</div>
+  <div style="font-family:var(--mono);font-size:12px;color:var(--amber)" id="energy-draw">0.00 kW</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--red);display:none" id="run-dry-badge">RUN DRY</div>
+  <div class="hdr-sep"></div>
+  <button class="btn sm" onclick="loadExample('cascade')">Cascade Example</button>
+  <button class="btn sm" onclick="loadExample('parallel')">Parallel Example</button>
+  <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
+  <button class="btn sm" onclick="saveProject()">Save JSON</button>
+  <label class="btn sm" for="upload-input">Upload JSON</label>
+  <input type="file" id="upload-input" accept=".json" style="display:none" onchange="uploadProject(event)">
+  <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
+  <button class="btn sm" onclick="openModal('help-modal')">Help</button>
+  <button class="btn pri sm" id="run-btn" onclick="runSimulation()">Run Simulation</button>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ MAIN -->
+<div class="main">
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ LEFT PANEL -->
+  <div class="left">
+
+    <!-- Component palette -->
+    <div class="sec" style="flex-shrink:0">
+      <div class="sec-hdr"><span class="sec-title">Components</span></div>
+      <div class="palette">
+        <div class="pal-item" onclick="addNode('source')">
+          <div class="pal-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <polygon points="11,2 21,20 1,20" fill="none" stroke="#18d8b0" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="pal-label">
+            <div class="pal-name">Source</div>
+            <div class="pal-desc">Feed inlet node</div>
+          </div>
+          <button class="btn sm icon pal-add">+</button>
+        </div>
+        <div class="pal-item" onclick="addNode('cstr')">
+          <div class="pal-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <circle cx="11" cy="11" r="9" fill="none" stroke="#f0a030" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="pal-label">
+            <div class="pal-name">CSTR</div>
+            <div class="pal-desc">Stirred-tank reactor</div>
+          </div>
+          <button class="btn sm icon pal-add">+</button>
+        </div>
+        <div class="pal-item" onclick="addNode('sink')">
+          <div class="pal-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <polygon points="11,2 20,11 11,20 2,11" fill="none" stroke="#40c878" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="pal-label">
+            <div class="pal-name">Sink</div>
+            <div class="pal-desc">Product demand node</div>
+          </div>
+          <button class="btn sm icon pal-add">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plant tree -->
+    <div class="sec" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="sec-hdr">
+        <span class="sec-title">Plant Tree</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)" id="node-count">0 nodes</span>
+      </div>
+      <div class="sec-body flex" id="plant-tree" style="flex:1;overflow-y:auto">
+        <div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;text-align:center;padding:16px">
+          Add components to begin.
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation parameters -->
+    <div class="sec" style="flex-shrink:0">
+      <div class="sec-hdr"><span class="sec-title">Simulation</span></div>
+      <div class="sec-body flex">
+        <div class="fr"><span class="fl">t end (s)</span><input class="fi" id="p-tend" type="number" value="200" min="1"></div>
+        <div class="fr"><span class="fl">Segments</span><input class="fi" id="p-segs" type="number" value="8" min="1" max="50"></div>
+        <div class="fr"><span class="fl">Plant name</span><input class="fi" id="p-name" value="My Plant" style="font-size:11px"></div>
+        <button class="btn sm teal" style="width:100%;margin-top:2px" onclick="autoBalance()">Auto-Balance</button>
+      </div>
+    </div>
+
+    <!-- Species properties -->
+    <div class="sec" id="sp-props-panel" style="flex-shrink:0">
+      <div class="sec-hdr">
+        <span class="sec-title">Species Properties</span>
+        <button class="btn sm icon" onclick="toggleSpProps()" title="Toggle">&#9660;</button>
+      </div>
+      <div id="sp-props-body" style="display:none;padding:6px;max-height:180px;overflow-y:auto">
+        <div id="sp-props-list" style="margin-bottom:4px"></div>
+        <div class="fr" style="gap:4px">
+          <input class="fi" id="sp-prop-name" placeholder="Name" style="width:55px;font-size:10px">
+          <input class="fi" id="sp-prop-rho" type="number" placeholder="ρ kg/m³" value="1000" style="width:70px;font-size:10px">
+          <input class="fi" id="sp-prop-mw" type="number" placeholder="MW g/mol" value="18" style="width:65px;font-size:10px">
+          <button class="btn sm icon" onclick="addSpeciesProp()" title="Add">+</button>
+        </div>
+      </div>
+    </div>
+    <!-- Mass balance (shows after shift-drag) -->
+    <div class="sec" id="mb-panel" style="flex-shrink:0;display:none">
+      <div class="sec-hdr">
+        <span class="sec-title">Mass Balance</span>
+        <button class="btn sm icon" onclick="document.getElementById('mb-panel').style.display='none'">x</button>
+      </div>
+      <div id="mb-body" class="sec-body flex" style="max-height:140px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CENTER WORKSPACE -->
+  <div class="center">
+    <div class="ws" id="ws-area">
+      <svg id="ws-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--border2)"/>
+          </marker>
+          <marker id="arrow-sel" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--amber)"/>
+          </marker>
+          <marker id="arrow-draw" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--teal)"/>
+          </marker>
+          <filter id="glow-amber"><feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="glow-teal"><feGaussianBlur stdDeviation="3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <pattern id="grid-pat" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M40,0L0,0L0,40" fill="none" stroke="#111825" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect id="ws-grid" width="100%" height="100%" fill="url(#grid-pat)"/>
+        <g id="ws-edges"></g>
+        <g id="ws-nodes"></g>
+        <rect id="ws-marquee" class="ws-marquee" style="display:none"/>
+        <line id="ws-drawing-edge" class="ws-edge drawing" style="display:none"/>
+      </svg>
+      <div class="ws-hint" id="ws-hint">Click palette to add nodes  |  Drag ports to connect  |  Shift+drag for mass balance</div>
+    </div>
+    <!-- Validation bar -->
+    <div class="val-bar" id="val-bar">
+      <div class="val-dot" id="val-dot" style="background:var(--text-dim)"></div>
+      <div class="val-txt" id="val-txt" style="color:var(--text-dim)">Build a network to validate.</div>
+      <button class="btn sm" style="margin-left:auto" onclick="validateNetwork()">Validate</button>
+    </div>
+  </div>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ RIGHT PANEL -->
+  <div class="right">
+    <div class="sec-hdr" style="border-bottom:1px solid var(--border)">
+      <span class="sec-title">Inspector</span>
+      <button class="btn sm icon" id="inspect-btn" onclick="openInspector()" style="display:none" title="Open detailed inspector">&#9783;</button>
+      <button class="btn sm danger" id="delete-btn" onclick="deleteSelected()" style="display:none">Delete</button>
+    </div>
+    <div id="ctx-panel" style="flex:1;overflow-y:auto">
+      <div class="ctx-none">Select a node or edge<br>to inspect properties.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ REACTOR INSPECT MODAL -->
+<div class="modal-overlay" id="reactor-modal">
+  <div class="modal" style="width:min(1100px,96vw);height:92vh;max-height:92vh">
+    <div class="modal-hdr">
+      <div class="modal-title" id="r-modal-title">Reactor — CSTR-1</div>
+      <div style="margin-left:12px;font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="r-modal-sub"></div>
+      <div class="hdr-sep"></div>
+      <button class="btn sm pri" onclick="inspectorApply()">Apply</button>
+      <button class="modal-close" onclick="closeModal('reactor-modal')">x</button>
+    </div>
+    <div class="modal-body" style="flex-direction:row;overflow:hidden">
+      <!-- Left: plot + timeline -->
+      <div style="width:420px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+        <div class="canvas-block" style="flex:1;min-height:0;padding:6px;overflow:hidden">
+          <canvas class="plot-canvas" id="r-conc-canvas" style="height:100%;max-height:220px"></canvas>
+        </div>
+        <!-- Timeline -->
+        <div class="tl">
+          <div class="tl-ctrl">
+            <button class="btn icon sm" onclick="tlSeek(0)">|&lt;</button>
+            <button class="btn icon sm" id="tl-play-btn" onclick="tlTogglePlay()">&gt;</button>
+            <button class="btn icon sm" onclick="tlStep(-1)">&lt;</button>
+            <button class="btn icon sm" onclick="tlStep(1)">&gt;</button>
+            <select class="spd-sel" id="tl-speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select>
+            <div class="tl-sep"></div>
+            <div class="t-disp" id="tl-t">t = 0</div>
+          </div>
+          <div class="tl-scrub">
+            <div class="tl-lbl" id="tl-s0">0</div>
+            <div class="rail" id="tl-rail">
+              <div class="rail-fill" id="tl-fill" style="width:0%"></div>
+              <div class="thumb" id="tl-thumb" style="left:0%"></div>
+            </div>
+            <div class="tl-lbl" id="tl-s1">200</div>
+          </div>
+        </div>
+        <!-- Temperature editor -->
+        <div style="border-top:1px solid var(--border);flex-shrink:0">
+          <div class="sec-hdr"><span class="sec-title">Temperature Profile</span>
+            <div style="display:flex;gap:3px">
+              <button class="btn sm" id="tt-const" onclick="setRTMode('constant')">CONST</button>
+              <button class="btn sm" id="tt-ramp" onclick="setRTMode('ramp')">RAMP</button>
+              <button class="btn sm" id="tt-step" onclick="setRTMode('step')">STEP</button>
+            </div>
+          </div>
+          <div class="tcanvas-wrap" style="padding:5px 8px">
+            <canvas class="tcanvas" id="r-t-canvas" height="68" style="height:68px;width:100%;display:block"></canvas>
+          </div>
+          <div style="padding:5px 8px;display:flex;gap:6px;align-items:center;border-top:1px solid var(--border)">
+            <span class="fl">T0 (K)</span>
+            <input class="fi" id="r-t0" type="number" value="298.15" step="0.5" style="width:80px" onchange="updateTProfile()">
+            <span class="fl" id="r-tf-label" style="display:none">T1 (K)</span>
+            <input class="fi" id="r-tf" type="number" value="340" step="0.5" style="width:80px;display:none" onchange="updateTProfile()">
+            <span class="fl" id="r-ts-label" style="display:none">t step (s)</span>
+            <input class="fi" id="r-ts" type="number" value="100" step="1" style="width:80px;display:none" onchange="updateTProfile()">
+          </div>
+        </div>
+      </div>
+      <!-- Right: tabs -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('r','info')">Info</button>
+          <button class="tab" onclick="switchTab('r','feeds')">Feeds</button>
+          <button class="tab" onclick="switchTab('r','species')">Species</button>
+          <button class="tab" onclick="switchTab('r','reactions')">Reactions</button>
+          <button class="tab" onclick="switchTab('r','outlet')">Outlet</button>
+          <button class="tab" onclick="switchTab('r','connections')">Connections</button>
+        </div>
+        <!-- Info tab -->
+        <div class="tab-body active" id="r-tab-info">
+          <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+            <div class="fr"><span class="fl">Name</span><input class="fi" id="r-name" value="CSTR-1"></div>
+            <div class="fr"><span class="fl">Volume (L)</span><input class="fi" id="r-vol" type="number" value="200"></div>
+            <div class="fr"><span class="fl">Type</span><input class="fi" id="r-type" value="CSTR" readonly style="color:var(--text-dim)"></div>
+            <hr style="border-color:var(--border);margin:4px 0">
+            <div class="ctx-grid" id="r-info-stats">
+              <div class="ctx-stat"><div class="ctx-stat-label">Residence Time</div><div class="ctx-stat-value" id="r-tau">— s</div></div>
+              <div class="ctx-stat"><div class="ctx-stat-label">Conversion</div><div class="ctx-stat-value teal" id="r-conv">—</div></div>
+              <div class="ctx-stat"><div class="ctx-stat-label">Inlet Flow</div><div class="ctx-stat-value" id="r-flow">—</div></div>
+              <div class="ctx-stat"><div class="ctx-stat-label">Status</div><div class="ctx-stat-value green" id="r-status">—</div></div>
+            </div>
+          </div>
+        </div>
+        <!-- Feeds tab -->
+        <div class="tab-body" id="r-tab-feeds">
+          <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+            <div id="r-feeds-list"></div>
+            <div class="add-toggle" onclick="toggleAddForm('r-add-feed')">
+              <span class="plus">+</span> Add Feed Stream
+            </div>
+            <div class="add-form-wrap" id="r-add-feed">
+              <div class="add-form">
+                <div class="fr"><span class="fl">Name</span><input class="fi" id="r-fn" placeholder="primary"></div>
+                <div class="fr"><span class="fl">Flow (m3/s)</span><input class="fi" id="r-fq" type="number" value="0.0005" step="0.0001"></div>
+                <div class="fr"><span class="fl">Species (k:v)</span><input class="fi" id="r-fsp" placeholder="A:2.0 B:0.0"></div>
+                <div class="fa">
+                  <button class="btn sm" onclick="toggleAddForm('r-add-feed')">Cancel</button>
+                  <button class="btn sm pri" onclick="addFeedToReactor()">Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Species tab -->
+        <div class="tab-body" id="r-tab-species">
+          <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+            <div id="r-species-list"></div>
+            <div class="add-toggle" onclick="toggleAddForm('r-add-sp')">
+              <span class="plus">+</span> Add Species
+            </div>
+            <div class="add-form-wrap" id="r-add-sp">
+              <div class="add-form">
+                <div class="fr"><span class="fl">Name</span><input class="fi" id="r-spn" placeholder="A"></div>
+                <div class="fr"><span class="fl">Initial (M)</span><input class="fi" id="r-spi" type="number" value="0"></div>
+                <div class="fa">
+                  <button class="btn sm" onclick="toggleAddForm('r-add-sp')">Cancel</button>
+                  <button class="btn sm pri" onclick="addSpeciesToReactor()">Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Reactions tab -->
+        <div class="tab-body" id="r-tab-reactions">
+          <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+            <div id="r-rxns-list"></div>
+            <div class="add-toggle" onclick="toggleAddForm('r-add-rxn')">
+              <span class="plus">+</span> Add Reaction
+            </div>
+            <div class="add-form-wrap" id="r-add-rxn">
+              <div class="add-form">
+                <div class="fr"><span class="fl">Reactants</span><input class="fi" id="r-rr" placeholder="A B (space-sep)"></div>
+                <div class="fr"><span class="fl">Products</span><input class="fi" id="r-rp" placeholder="C"></div>
+                <div class="fr"><span class="fl">Rate k</span><input class="fi" id="r-rk" type="number" value="0.05" step="any"></div>
+                <div class="fr"><span class="fl">Ea (J/mol)</span><input class="fi" id="r-rea" type="number" value="0"></div>
+                <div class="fr"><span class="fl">A (pre-exp)</span><input class="fi" id="r-ra" type="number" value="0"></div>
+                <div class="fa">
+                  <button class="btn sm" onclick="toggleAddForm('r-add-rxn')">Cancel</button>
+                  <button class="btn sm pri" onclick="addReactionToReactor()">Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Outlet tab -->
+        <div class="tab-body" id="r-tab-outlet">
+          <div style="padding:8px">
+            <div id="r-outlet-content">
+              <div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">
+                Run simulation to view outlet composition.
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Connections tab -->
+        <div class="tab-body" id="r-tab-connections">
+          <div style="padding:8px">
+            <div class="ctx-label" style="margin-bottom:5px">Inlet Connections</div>
+            <div id="r-inlets"></div>
+            <div class="ctx-label" style="margin:8px 0 5px">Outlet Connections</div>
+            <div id="r-outlets"></div>
+            <div class="ctx-label" style="margin:8px 0 5px">Error State</div>
+            <div id="r-error-state" style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">No errors.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PIPE INSPECT MODAL -->
+<div class="modal-overlay" id="pipe-modal">
+  <div class="modal" style="width:680px;height:76vh">
+    <div class="modal-hdr">
+      <div class="modal-title" id="p-modal-title">Pipeline Inspector</div>
+      <div class="hdr-sep"></div>
+      <button class="btn sm pri" onclick="applyPipeChanges()">Apply</button>
+      <button class="modal-close" onclick="closeModal('pipe-modal')">x</button>
+    </div>
+    <div class="modal-body" style="flex-direction:row">
+      <!-- Left: hydraulics -->
+      <div style="width:300px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column">
+        <div class="sec-hdr"><span class="sec-title">Geometry</span></div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--border)">
+          <div class="fr"><span class="fl">Length (m)</span><input class="fi" id="pipe-len" type="number" value="30"></div>
+          <div class="fr"><span class="fl">Diam (m)</span><input class="fi" id="pipe-dia" type="number" value="0.06" step="0.001"></div>
+          <div class="fr"><span class="fl">Elevation (m)</span><input class="fi" id="pipe-elev" type="number" value="0"></div>
+          <div class="fr"><span class="fl">K fittings</span><input class="fi" id="pipe-k" type="number" value="2" step="0.5"></div>
+          <div class="fr"><span class="fl">Flow (m3/s)</span><input class="fi" id="pipe-flow" type="number" value="0.0005" step="0.0001"></div>
+          <div class="fr"><span class="fl">Pump η</span><input class="fi" id="pipe-eta" type="number" value="0.75" step="0.01" min="0.01" max="1.0" title="Per-pipe pump efficiency (0-1)"></div>
+        </div>
+        <div class="sec-hdr"><span class="sec-title">Hydraulics</span></div>
+        <div style="flex:1;overflow-y:auto">
+          <table class="hyd-table" id="hyd-table">
+            <tbody>
+              <tr><th colspan="2" style="background:var(--bg)">Run simulation to compute hydraulics.</th></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Right: pressure charts + sweep -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div class="tabs">
+          <button class="tab active" onclick="switchPipeTab('sweep')">System Curve</button>
+          <button class="tab" onclick="switchPipeTab('pump')">Pump Curve</button>
+          <button class="tab" onclick="switchPipeTab('regime')">Regime Map</button>
+          <button class="tab" onclick="switchPipeTab('fanning')">Fanning/Darcy</button>
+        </div>
+        <!-- Sweep tab -->
+        <div id="pipe-tab-sweep" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:5px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Q range (L/s):</span>
+            <input class="fi" id="sweep-qmin" type="number" value="0.05" step="0.01" style="width:60px;font-size:10px">
+            <span style="color:var(--text-dim);font-family:var(--mono);font-size:10px">to</span>
+            <input class="fi" id="sweep-qmax" type="number" value="5" step="0.1" style="width:60px;font-size:10px">
+            <button class="btn sm" onclick="runPipePlots()">Load Plots</button>
+          </div>
+          <div style="flex:1;padding:6px;min-height:0;overflow-y:auto;text-align:center">
+            <img id="pipe-sweep-img" style="max-width:100%;display:none">
+            <div id="pipe-sweep-placeholder" style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:30px">Click Load Plots to generate.</div>
+          </div>
+        </div>
+        <!-- Pump curve tab -->
+        <div id="pipe-tab-pump" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+          <div style="flex:1;padding:6px;min-height:0;overflow-y:auto;text-align:center">
+            <img id="pipe-pump-img" style="max-width:100%;display:none">
+            <div id="pipe-pump-placeholder" style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:30px">Load plots first.</div>
+          </div>
+        </div>
+        <!-- Regime map tab -->
+        <div id="pipe-tab-regime" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+          <div style="flex:1;padding:6px;min-height:0;overflow-y:auto;text-align:center">
+            <img id="pipe-regime-img" style="max-width:100%;display:none">
+            <div id="pipe-regime-placeholder" style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:30px">Load plots first.</div>
+          </div>
+        </div>
+        <!-- Fanning vs Darcy tab -->
+        <div id="pipe-tab-fanning" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+          <div style="flex:1;padding:6px;min-height:0;overflow-y:auto;text-align:center">
+            <img id="pipe-fanning-img" style="max-width:100%;display:none">
+            <div id="pipe-fanning-placeholder" style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:30px">Load plots first.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ OPTIMIZER MODAL -->
+<div class="modal-overlay" id="opt-modal">
+  <div class="modal" style="width:840px;height:88vh">
+    <div class="modal-hdr">
+      <div class="modal-title">Optimizer</div>
+      <div style="margin-left:10px;font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+        Multi-Objective Plant Optimization
+      </div>
+      <div class="hdr-sep"></div>
+      <button class="btn sm pri" id="opt-run-btn" onclick="runOptimizer()">Run NSGA-II</button>
+      <button class="modal-close" onclick="closeModal('opt-modal')">x</button>
+    </div>
+    <div class="modal-body" style="flex-direction:row">
+      <!-- Left: config -->
+      <div style="width:320px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto">
+        <!-- Decision Variables -->
+        <div class="sec-hdr"><span class="sec-title">Decision Variables</span>
+          <button class="btn sm icon" onclick="addDecisionVar()">+</button></div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:4px" id="dv-list">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;padding:8px">
+            No decision variables defined.
+          </div>
+        </div>
+        <!-- Objectives -->
+        <div class="sec-hdr"><span class="sec-title">Objectives</span>
+          <button class="btn sm icon" onclick="addObjective()">+</button></div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:4px" id="obj-list">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;padding:8px">
+            No objectives defined.
+          </div>
+        </div>
+        <!-- Optimizer settings -->
+        <div class="sec-hdr"><span class="sec-title">Settings</span></div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+          <div class="fr"><span class="fl">Method</span>
+            <select class="fi" id="opt-method">
+              <option value="nsga2">NSGA-II (Pareto)</option>
+              <option value="weighted">Weighted Sum</option>
+              <option value="slsqp">SLSQP (Single)</option>
+            </select>
+          </div>
+          <div class="fr"><span class="fl">Pop size</span><input class="fi" id="opt-pop" type="number" value="20"></div>
+          <div class="fr"><span class="fl">Generations</span><input class="fi" id="opt-gen" type="number" value="10"></div>
+          <div class="fr"><span class="fl">t sim (s)</span><input class="fi" id="opt-tend" type="number" value="200"></div>
+          <div class="fr"><span class="fl">Segments</span><input class="fi" id="opt-segs" type="number" value="6"></div>
+        </div>
+      </div>
+      <!-- Right: results -->
+      <div style="flex:1;display:flex;flex-direction:column">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('opt','pareto')">Pareto Front</button>
+          <button class="tab" onclick="switchTab('opt','convergence')">Convergence</button>
+          <button class="tab" onclick="switchTab('opt','results')">Best Solution</button>
+        </div>
+        <div class="tab-body active" id="opt-tab-pareto">
+          <div style="padding:6px">
+            <canvas class="plot-canvas" id="opt-pareto-canvas" height="360"></canvas>
+          </div>
+          <div style="padding:6px 10px;font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="opt-pareto-info">
+            Run optimization to generate Pareto front.
+          </div>
+        </div>
+        <div class="tab-body" id="opt-tab-convergence">
+          <div style="padding:6px">
+            <canvas class="plot-canvas" id="opt-conv-canvas" height="360"></canvas>
+          </div>
+        </div>
+        <div class="tab-body" id="opt-tab-results">
+          <div style="padding:12px" id="opt-results-body">
+            <div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">
+              Run optimization to see best solution.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SOURCE/SINK CONFIG MODAL -->
+<div class="modal-overlay" id="node-config-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="nc-title">Configure Node</div>
+      <div class="hdr-sep"></div>
+      <button class="btn sm pri" onclick="applyNodeConfig()">Apply</button>
+      <button class="modal-close" onclick="closeModal('node-config-modal')">x</button>
+    </div>
+    <div class="modal-body" style="padding:12px;gap:8px;overflow-y:auto;max-height:70vh">
+      <div id="nc-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ FIX PROPOSAL MODAL -->
+<div class="modal-overlay" id="fix-modal">
+  <div class="modal" style="width:540px">
+    <div class="modal-hdr">
+      <div class="modal-title" style="color:var(--red)">Instability Detected</div>
+      <div style="margin-left:8px;font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="fix-modal-sub"></div>
+      <div class="hdr-sep"></div>
+      <button class="modal-close" onclick="closeModal('fix-modal')">x</button>
+    </div>
+    <div class="modal-body" style="padding:12px;overflow-y:auto;max-height:70vh;flex-direction:column;gap:8px">
+      <div id="fix-proposals-body">
+        <div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">Loading proposals...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ HELP MODAL -->
+<div class="modal-overlay" id="help-modal">
+  <div class="modal" style="width:760px;height:86vh">
+    <div class="modal-hdr">
+      <div class="modal-title">Documentation</div>
+      <div class="hdr-sep"></div>
+      <button class="modal-close" onclick="closeModal('help-modal')">x</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-body" id="help-body">Loading documentation...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SCRIPT -->
+<script>
+/* ════════════════════════════════════════════════════════════════════ STATE */
+const COLORS=['#f0a030','#18d8b0','#4a90f5','#d050c8','#50d8f0','#40c878','#e84040','#a060f0','#f0d040','#c87840'];
+const API='';  // same origin
+
+let PLANT = {
+  nodes: [],   // {id, type:'source'|'cstr'|'sink', label, x, y, config:{}}
+  edges: [],   // {id, src, tgt, config:{}}
+  result: null // from /api/simulate
+};
+
+let UI = {
+  selected: null,       // {type:'node'|'edge', id}
+  dragging: null,       // {nodeId, ox, oy}
+  drawingEdge: null,    // {srcId, srcPort}
+  marquee: null,        // {x0,y0,x1,y1}
+  inspectorNodeId: null,
+  inspectorEdgeId: null,
+  tlFrame: 0,
+  tlPlaying: false,
+  tlAnim: null,
+  tlData: null,         // {time[], conc[][], names[]}
+  rTMode: 'constant',
+  optDVars: [],
+  optObjectives: [],
+};
+
+let _nodeCounter = 0;
+let _edgeCounter = 0;
+
+/* ════════════════════════════════════════════════════════════════ UTILITIES */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function clr(i){return COLORS[i%COLORS.length]}
+function nodeId(){return 'N'+(++_nodeCounter)}
+function edgeId(){return 'E'+(++_edgeCounter)}
+
+function toast(msg,ms=3000){
+  const d=document.createElement('div');d.className='toast';d.textContent=msg;
+  document.body.appendChild(d);
+  _restack();
+  setTimeout(()=>{d.remove();_restack();},ms);
+}
+const _restack=()=>{
+  const all=[...document.querySelectorAll('.toast')];
+  all.forEach((el,i)=>{el.style.bottom=(60+i*42)+'px';el.style.zIndex=300+i;});
+};
+
+function setStatus(cls,msg){
+  document.getElementById('sdot').className='dot '+(cls||'');
+  document.getElementById('stxt').textContent=msg;
+}
+
+/* ════════════════════════════════════════════════════════════════════= API */
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  try{
+    const r=await fetch(API+path,opts);
+    return r.json();
+  }catch(e){return{status:'error',message:e.message}}
+}
+
+/* ════════════════════════════════════════════════════════════ WORKSPACE SVG */
+const svg=document.getElementById('ws-svg');
+const gEdges=document.getElementById('ws-edges');
+const gNodes=document.getElementById('ws-nodes');
+const marqueeEl=document.getElementById('ws-marquee');
+const drawingLine=document.getElementById('ws-drawing-edge');
+
+function svgPt(e){
+  const r=svg.getBoundingClientRect();
+  return{x:e.clientX-r.left,y:e.clientY-r.top};
+}
+
+// ─── Node shapes ──────────────────────────────────────────────────────────
+function nodeColor(type){
+  if(type==='source')return'#18d8b0';
+  if(type==='cstr')return'#f0a030';
+  if(type==='sink')return'#40c878';
+  return'#888';
+}
+function nodeShape(node){
+  const c=nodeColor(node.type);
+  const {x,y,type,label,id}=node;
+  let shapeEl='';
+  const r=28;
+  if(type==='source'){
+    shapeEl=`<polygon points="${x},${y-r} ${x+r*.87},${y+r*.5} ${x-r*.87},${y+r*.5}"
+      class="ws-node-bg" fill="${c}22" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  }else if(type==='cstr'){
+    shapeEl=`<circle cx="${x}" cy="${y}" r="${r}"
+      class="ws-node-bg" fill="${c}22" stroke="${c}" stroke-width="1.5"/>`;
+  }else{// sink (diamond)
+    shapeEl=`<polygon points="${x},${y-r} ${x+r},${y} ${x},${y+r} ${x-r},${y}"
+      class="ws-node-bg" fill="${c}22" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  }
+  const isSelected=UI.selected&&UI.selected.type==='node'&&UI.selected.id===id;
+  const isError=PLANT.result?.run_dry_reactors?.includes(node.label);
+  const glowFilter=isSelected?`filter="url(#glow-${type==='cstr'?'amber':'teal'})"`:'';;
+  const outPort=type!=='sink'?`<circle class="ws-port out-port" data-node="${id}" data-dir="out"
+    cx="${x+r}" cy="${y}" r="5" fill="${c}44" stroke="${c}" stroke-width="1" data-cx="${x+r}" data-cy="${y}"/>`:'';;
+  const inPort=type!=='source'?`<circle class="ws-port in-port" data-node="${id}" data-dir="in"
+    cx="${x-r}" cy="${y}" r="5" fill="${c}44" stroke="${c}" stroke-width="1" data-cx="${x-r}" data-cy="${y}"/>`:'';;
+  const selRing=isSelected?`<circle cx="${x}" cy="${y}" r="${r+6}" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>`:'';;
+  const typeLabel=type.toUpperCase();
+  return`<g class="ws-node-g${isError?' node-error':''}" data-id="${id}" ${glowFilter} style="cursor:grab">
+    ${selRing}${shapeEl}
+    <text class="ws-label" x="${x}" y="${y-5}">${esc(label)}</text>
+    <text class="ws-label ws-label-sub" x="${x}" y="${y+9}">${typeLabel}</text>
+    ${outPort}${inPort}
+  </g>`;
+}
+
+function renderWorkspace(){
+  // Edges
+  gEdges.innerHTML=PLANT.edges.map(edge=>{
+    const src=PLANT.nodes.find(n=>n.id===edge.src);
+    const tgt=PLANT.nodes.find(n=>n.id===edge.tgt);
+    if(!src||!tgt)return'';
+    const r=28;
+    const x1=src.x+r,y1=src.y;
+    const x2=tgt.x-r,y2=tgt.y;
+    const mx=(x1+x2)/2;
+    const path=`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    const isSel=UI.selected&&UI.selected.type==='edge'&&UI.selected.id===edge.id;
+    const strokeCol=isSel?'var(--amber)':'var(--border2)';
+    const marker=isSel?'url(#arrow-sel)':'url(#arrow)';
+    const flow=edge.config?.flow_rate_m3s?`${(edge.config.flow_rate_m3s*1e3).toFixed(2)} L/s`:'';
+    const _ck=`${src?.label||''}→${tgt?.label||''}`;
+    const diag=PLANT.result?.connection_diags?.[_ck];
+    const pumpStr=diag?` | ${(diag.pump_delta_p_kPa||diag.pressure_drop_kPa||0).toFixed(1)} kPa / ${(diag.pump_power_kW||diag.compressor_kW||0).toFixed(3)} kW`:'';
+    const edgeLabel=flow+(pumpStr);
+    const feasWarn=diag&&diag.pump_feasible===false;
+    const edgeCol=feasWarn?'var(--red)':isSel?'var(--amber)':'var(--border2)';
+    return`<g class="ws-edge-g" data-id="${edge.id}" style="cursor:pointer">
+      <path d="${path}" fill="none" stroke="${edgeCol}" stroke-width="${isSel?2:1.5}" marker-end="${marker}"/>
+      ${edgeLabel?`<text x="${mx}" y="${(y1+y2)/2-7}" style="font-family:var(--mono);font-size:9px;fill:var(--text-dim);text-anchor:middle">${esc(edgeLabel)}</text>`:''}
+    </g>`;
+  }).join('');
+  // Nodes
+  gNodes.innerHTML=PLANT.nodes.map(nodeShape).join('');
+  attachNodeListeners();
+  renderPlantTree();
+  validateNetwork();
+}
+
+function attachNodeListeners(){
+  // Node drag
+  document.querySelectorAll('.ws-node-g').forEach(g=>{
+    g.addEventListener('mousedown',e=>{
+      if(e.target.classList.contains('ws-port'))return;
+      e.stopPropagation();
+      const id=g.dataset.id;
+      const node=PLANT.nodes.find(n=>n.id===id);
+      if(!node)return;
+      const pt=svgPt(e);
+      UI.dragging={id,ox:pt.x-node.x,oy:pt.y-node.y};
+      select('node',id);
+    });
+    g.addEventListener('dblclick',e=>{
+      e.stopPropagation();
+      openInspector(g.dataset.id);
+    });
+  });
+  // Port click
+  document.querySelectorAll('.ws-port').forEach(p=>{
+    p.addEventListener('mousedown',e=>{
+      e.stopPropagation();
+      e.preventDefault();
+      const nodeId=p.dataset.node;
+      const dir=p.dataset.dir;
+      if(dir==='out'){
+        const cx=parseFloat(p.dataset.cx),cy=parseFloat(p.dataset.cy);
+        UI.drawingEdge={srcId:nodeId,x0:cx,y0:cy};
+        drawingLine.setAttribute('x1',cx);drawingLine.setAttribute('y1',cy);
+        drawingLine.setAttribute('x2',cx);drawingLine.setAttribute('y2',cy);
+        drawingLine.style.display='';
+        drawingLine.setAttribute('marker-end','url(#arrow-draw)');
+      }else if(dir==='in'&&UI.drawingEdge){
+        // Complete edge
+        const srcId=UI.drawingEdge.srcId;
+        if(srcId!==nodeId){
+          // Check no duplicate
+          const exists=PLANT.edges.find(e=>e.src===srcId&&e.tgt===nodeId);
+          if(!exists){
+            PLANT.edges.push({id:edgeId(),src:srcId,tgt:nodeId,config:{
+              length:10,diameter:0.05,elevation_change:0,n_fittings_K:2,
+              flow_rate_m3s:0.0005,pump_efficiency:0.75
+            }});
+            toast('Edge added.');renderWorkspace();
+          }else toast('Connection already exists.');
+        }
+        UI.drawingEdge=null;drawingLine.style.display='none';
+      }
+    });
+  });
+  // Edge click
+  document.querySelectorAll('.ws-edge-g').forEach(g=>{
+    g.addEventListener('click',e=>{e.stopPropagation();select('edge',g.dataset.id);});
+    g.addEventListener('dblclick',e=>{e.stopPropagation();openPipeInspector(g.dataset.id);});
+  });
+}
+
+// SVG-level mouse events
+svg.addEventListener('mousemove',e=>{
+  const pt=svgPt(e);
+  if(UI.dragging){
+    const node=PLANT.nodes.find(n=>n.id===UI.dragging.id);
+    if(node){node.x=pt.x-UI.dragging.ox;node.y=pt.y-UI.dragging.oy;}
+    renderWorkspace();
+    return;
+  }
+  if(UI.drawingEdge){
+    drawingLine.setAttribute('x2',pt.x);drawingLine.setAttribute('y2',pt.y);
+    return;
+  }
+  if(UI.marquee&&e.shiftKey){
+    UI.marquee.x1=pt.x;UI.marquee.y1=pt.y;
+    const mx=Math.min(UI.marquee.x0,UI.marquee.x1);
+    const my=Math.min(UI.marquee.y0,UI.marquee.y1);
+    const mw=Math.abs(UI.marquee.x1-UI.marquee.x0);
+    const mh=Math.abs(UI.marquee.y1-UI.marquee.y0);
+    marqueeEl.setAttribute('x',mx);marqueeEl.setAttribute('y',my);
+    marqueeEl.setAttribute('width',mw);marqueeEl.setAttribute('height',mh);
+    marqueeEl.style.display='';
+  }
+});
+
+svg.addEventListener('mousedown',e=>{
+  const pt=svgPt(e);
+  if(e.shiftKey){
+    UI.marquee={x0:pt.x,y0:pt.y,x1:pt.x,y1:pt.y};
+    marqueeEl.setAttribute('x',pt.x);marqueeEl.setAttribute('y',pt.y);
+    marqueeEl.setAttribute('width',0);marqueeEl.setAttribute('height',0);
+    marqueeEl.style.display='';
+    return;
+  }
+  // Deselect
+  if(!e.target.closest('.ws-node-g')&&!e.target.closest('.ws-edge-g')){
+    select(null,null);
+    if(UI.drawingEdge){UI.drawingEdge=null;drawingLine.style.display='none';}
+  }
+});
+
+window.addEventListener('mouseup',e=>{
+  if(UI.marquee){
+    // Compute mass balance for selected nodes
+    const mx0=Math.min(UI.marquee.x0,UI.marquee.x1);
+    const mx1=Math.max(UI.marquee.x0,UI.marquee.x1);
+    const my0=Math.min(UI.marquee.y0,UI.marquee.y1);
+    const my1=Math.max(UI.marquee.y0,UI.marquee.y1);
+    const sel=PLANT.nodes.filter(n=>n.x>=mx0&&n.x<=mx1&&n.y>=my0&&n.y<=my1);
+    if(sel.length>0)showMassBalance(sel);
+    UI.marquee=null;marqueeEl.style.display='none';
+  }
+  if(UI.dragging){UI.dragging=null;}
+  if(UI.drawingEdge&&!e.target.classList.contains('ws-port')){
+    UI.drawingEdge=null;drawingLine.style.display='none';
+  }
+});
+
+// ─── Selection ────────────────────────────────────────────────────────────
+function select(type,id){
+  UI.selected=type?{type,id}:null;
+  const inspBtn=document.getElementById('inspect-btn');
+  const delBtn=document.getElementById('delete-btn');
+  inspBtn.style.display=type?'':'none';
+  delBtn.style.display=type?'':'none';
+  renderWorkspace();
+  renderContextPanel();
+}
+
+function deleteSelected(){
+  if(!UI.selected)return;
+  if(UI.selected.type==='node'){
+    PLANT.nodes=PLANT.nodes.filter(n=>n.id!==UI.selected.id);
+    PLANT.edges=PLANT.edges.filter(e=>e.src!==UI.selected.id&&e.tgt!==UI.selected.id);
+  }else{
+    PLANT.edges=PLANT.edges.filter(e=>e.id!==UI.selected.id);
+  }
+  select(null,null);toast('Deleted.');
+}
+
+// ─── Add node ─────────────────────────────────────────────────────────────
+function addNode(type){
+  const r=svg.getBoundingClientRect();
+  const cx=r.width/2+(Math.random()-0.5)*80;
+  const cy=r.height/2+(Math.random()-0.5)*60;
+  const count=PLANT.nodes.filter(n=>n.type===type).length+1;
+  const prefixes={source:'SRC',cstr:'CSTR',sink:'SNK'};
+  const label=`${prefixes[type]||type.toUpperCase()}-${count}`;
+  const config = type==='source'
+    ? {species:{A:2.0},flow_rate_m3s:0.0005}
+    : type==='sink'
+    ? {demand_pressure_Pa:101325,product_specs:{},min_purity:{}}
+    : {volume_L:200,feeds:[],species:[{name:'A',initial:2.0},{name:'B',initial:0.0}],
+       reactions:[{reactants:'A',products:'B',rate:0.05,activation_energy:0,pre_exponential:0}],
+       temperature:{mode:'isothermal',T_kelvin:298.15}};
+  PLANT.nodes.push({id:nodeId(),type,label,x:cx,y:cy,config});
+  renderWorkspace();
+  toast(`${label} added.`);
+}
+
+/* ════════════════════════════════════════════════════════════════ PLANT TREE */
+function renderPlantTree(){
+  const el=document.getElementById('plant-tree');
+  const nodesByType={source:[],cstr:[],sink:[]};
+  PLANT.nodes.forEach(n=>{(nodesByType[n.type]||[]).push(n)});
+  const tc=PLANT.nodes.length;
+  document.getElementById('node-count').textContent=`${tc} node${tc!==1?'s':''}`;
+  if(!tc){
+    el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;text-align:center;padding:16px">Add components to begin.</div>';
+    return;
+  }
+  let html='';
+  const sections=[['source','Sources'],['cstr','Reactors'],['sink','Sinks']];
+  sections.forEach(([t,label])=>{
+    if(!nodesByType[t]?.length)return;
+    html+=`<div style="font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);padding:4px 2px 2px">${label}</div>`;
+    nodesByType[t].forEach(n=>{
+      const c=nodeColor(n.type);
+      const isSel=UI.selected?.id===n.id;
+      const resultInfo=PLANT.result?.reactor_results?.[n.label];
+      const convText=resultInfo?` — ${Object.entries(resultInfo.conversion||{}).map(([k,v])=>`${k}:${(v*100).toFixed(0)}%`).join(' ')}`:'';
+      html+=`<div class="tree-item${isSel?' selected':''}" onclick="select('node','${n.id}')" ondblclick="openInspector('${n.id}')">
+        <div class="tree-dot" style="background:${c}"></div>
+        <div class="tree-name">${esc(n.label)}</div>
+        <div class="tree-type">${n.type}${convText}</div>
+      </div>`;
+    });
+  });
+  if(PLANT.edges.length){
+    html+=`<div style="font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);padding:6px 2px 2px">Connections</div>`;
+    PLANT.edges.forEach(e=>{
+      const src=PLANT.nodes.find(n=>n.id===e.src);
+      const tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+      if(!src||!tgt)return;
+      const isSel=UI.selected?.id===e.id;
+      html+=`<div class="tree-item${isSel?' selected':''}" onclick="select('edge','${e.id}')" ondblclick="openPipeInspector('${e.id}')">
+        <div class="tree-dot" style="background:var(--border2)"></div>
+        <div class="tree-name" style="color:var(--text-dim)">${esc(src.label)} &rarr; ${esc(tgt.label)}</div>
+        <div class="tree-type">pipe</div>
+      </div>`;
+    });
+  }
+  el.innerHTML=html;
+}
+
+/* ════════════════════════════════════════════════════════════ CONTEXT PANEL */
+function renderContextPanel(){
+  const el=document.getElementById('ctx-panel');
+  if(!UI.selected){el.innerHTML='<div class="ctx-none">Select a node or edge<br>to inspect properties.</div>';return;}
+  if(UI.selected.type==='node'){
+    const node=PLANT.nodes.find(n=>n.id===UI.selected.id);
+    if(!node){el.innerHTML='';return;}
+    const c=nodeColor(node.type);
+    const result=PLANT.result;
+    let html=`<div class="ctx-section">
+      <div class="ctx-label">Node</div>
+      <div class="ctx-value" style="color:${c}">${esc(node.label)}</div>
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);margin-top:2px">${node.type.toUpperCase()}</div>
+    </div>`;
+    if(node.type==='source'){
+      const P_kPa=node.config?.pressure_kPa||101.325;
+      const P_flag=node.config?.pressure_mode==='atm';
+      html+=`<div class="ctx-section"><div class="ctx-label">Source</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--teal)">P = ${P_kPa.toFixed(1)} kPa</span>
+          ${P_flag?`<span style="font-family:var(--mono);font-size:9px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;padding:0 4px">⚠ default</span>`:''}
+        </div>`;
+      Object.entries(node.config?.species||{}).forEach(([sp,c])=>{
+        html+=`<div class="mb-row"><span class="sp">${esc(sp)}</span><span class="num-in">${c} M</span></div>`;
+      });
+      html+=`<div style="margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--text-dim)">Q = ${((node.config?.flow_rate_m3s||0)*1e3).toFixed(3)} L/s</div></div>`;
+    }else if(node.type==='sink'){
+      const P_kPa=node.config?.pressure_kPa||101.325;
+      const P_flag=node.config?.pressure_mode==='atm';
+      html+=`<div class="ctx-section"><div class="ctx-label">Sink</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-family:var(--mono);font-size:12px;color:var(--green)">P = ${P_kPa.toFixed(1)} kPa</span>
+          ${P_flag?`<span style="font-family:var(--mono);font-size:9px;color:var(--amber);border:1px solid var(--amber);border-radius:2px;padding:0 4px">⚠ default</span>`:''}
+        </div>
+      </div>`;
+    }else{// CSTR
+      const rr=result?.reactor_results?.[node.label];
+      if(rr){
+        html+=`<div class="ctx-section"><div class="ctx-grid">
+          <div class="ctx-stat"><div class="ctx-stat-label">Conversion</div>
+            <div class="ctx-stat-value teal">${Object.values(rr.conversion||{}).map(v=>(v*100).toFixed(1)+'%').join(' ')}</div></div>
+          <div class="ctx-stat"><div class="ctx-stat-label">Residence</div>
+            <div class="ctx-stat-value">${rr.residence_time_s?rr.residence_time_s.toFixed(1)+'s':'—'}</div></div>
+        </div></div>
+        <div class="ctx-section"><div class="ctx-label">Outlet Composition</div>
+        <table class="res-table"><thead><tr><th>Species</th><th>Conc (M)</th></tr></thead><tbody>`;
+        Object.entries(rr.outlet_composition||{}).forEach(([sp,v],i)=>{
+          html+=`<tr><td><span class="sp-badge" style="background:${clr(i)}"></span>${esc(sp)}</td><td style="color:var(--amber);font-family:var(--mono)">${v.toFixed(4)}</td></tr>`;
+        });
+        html+=`</tbody></table></div>`;
+      }else{
+        html+=`<div class="ctx-section"><div class="ctx-label">Config</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text)">V = ${node.config.volume_L||200} L</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px">Run simulation for results.</div>
+        </div>`;
+      }
+    }
+    // Species demand (all node types)
+    const demandSp=node.type==='source'?Object.keys(node.config.species||{})
+      :node.type==='sink'?Object.keys(node.config.product_specs||{})
+      :(node.config.species||[]).map(s=>s.name);
+    if(demandSp.length){
+      html+=`<div class="ctx-section"><div class="ctx-label">Species</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">`;
+      demandSp.forEach((sp,i)=>{
+        html+=`<span style="font-family:var(--mono);font-size:11px;padding:2px 7px;background:${clr(i)}22;border:1px solid ${clr(i)}66;border-radius:3px;color:${clr(i)}">${esc(sp)}</span>`;
+      });
+      html+=`</div></div>`;
+    }
+    el.innerHTML=html;
+  }else{
+    const edge=PLANT.edges.find(e=>e.id===UI.selected.id);
+    if(!edge){el.innerHTML='';return;}
+    const src=PLANT.nodes.find(n=>n.id===edge.src);
+    const tgt=PLANT.nodes.find(n=>n.id===edge.tgt);
+    const _ck=`${src?.label||''}→${tgt?.label||''}`;
+    const diag=PLANT.result?.connection_diags?.[_ck];
+    const eta=(edge.config?.pump_efficiency||0.75)*100;
+    let html=`<div class="ctx-section">
+      <div class="ctx-label">Pipeline</div>
+      <div class="ctx-value" style="font-size:11px">${esc(src?.label||'?')} → ${esc(tgt?.label||'?')}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:2px">η = ${eta.toFixed(0)}%  |  Q = ${((edge.config?.flow_rate_m3s||0)*1000).toFixed(3)} L/s</div>
+    </div>`;
+    if(diag){
+      const feasCls=diag.pump_feasible===false?'warn':'good';
+      const regimeCls={'turbulent':'good','laminar':'warn','transitional':'warn'}[diag.flow_regime||'']||'';
+      html+=`<div class="ctx-section"><div class="ctx-grid">
+        <div class="ctx-stat"><div class="ctx-stat-label">Pump ΔP</div>
+          <div class="ctx-stat-value ${feasCls}">${(diag.pump_delta_p_kPa||diag.pressure_drop_kPa||0).toFixed(1)} kPa</div></div>
+        <div class="ctx-stat"><div class="ctx-stat-label">Pump Power</div>
+          <div class="ctx-stat-value">${(diag.pump_power_kW||diag.compressor_kW||0).toFixed(3)} kW</div></div>
+        <div class="ctx-stat"><div class="ctx-stat-label">Reynolds</div>
+          <div class="ctx-stat-value teal">${(diag.reynolds_number||0).toFixed(0)}</div></div>
+        <div class="ctx-stat"><div class="ctx-stat-label">Regime</div>
+          <div class="ctx-stat-value ${regimeCls}" style="font-size:11px">${diag.flow_regime||'—'}</div></div>
+      </div>
+      ${diag.roughness_default||diag.density_default?`<div style="font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:4px">
+        ${diag.roughness_default?'⚠ roughness = steel default  ':''}${diag.density_default?'⚠ density = water default':''}
+      </div>`:''}
+      </div>`;
+    }else{
+      html+=`<div class="ctx-section">
+        <div class="fr"><span class="fl">Flow (L/s)</span>
+          <input class="fi" type="number" value="${((edge.config?.flow_rate_m3s||5e-4)*1e3).toFixed(3)}" step="0.001"
+            onchange="edge_cfg('${edge.id}','flow_rate_m3s',+this.value/1000)">
+        </div>
+        <div class="fr" style="margin-top:4px"><span class="fl">Pump η</span>
+          <input class="fi" type="number" value="${eta.toFixed(0)}" step="1" min="1" max="100"
+            onchange="edge_cfg('${edge.id}','pump_efficiency',+this.value/100)">
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:6px">Run simulation for hydraulics.</div>
+      </div>`;
+    }
+    el.innerHTML=html;
+  }
+}
+function edge_cfg(eid,k,v){
+  const e=PLANT.edges.find(x=>x.id===eid);if(e)e.config[k]=v;
+}
+
+/* ════════════════════════════════════════════════════════════════ VALIDATION */
+function validateNetwork(){
+  const bar=document.getElementById('val-bar');
+  const dot=document.getElementById('val-dot');
+  const txt=document.getElementById('val-txt');
+  if(!PLANT.nodes.length){
+    dot.style.background='var(--text-dim)';txt.textContent='Build a network to validate.';txt.className='val-txt';return;
+  }
+  const issues=[];
+  PLANT.nodes.forEach(n=>{
+    if(n.type==='cstr'){
+      const hasIn=PLANT.edges.some(e=>e.tgt===n.id)||n.config.feeds?.length;
+      const hasSp=n.config.species?.length;
+      if(!hasIn)issues.push(`${n.label}: no inlet feed or connection`);
+      if(!hasSp)issues.push(`${n.label}: no species defined`);
+    }
+    if(n.type==='source'&&!PLANT.edges.some(e=>e.src===n.id))
+      issues.push(`${n.label}: not connected to any reactor`);
+    if(n.type==='sink'&&!PLANT.edges.some(e=>e.tgt===n.id))
+      issues.push(`${n.label}: no inlet connection`);
+  });
+  // Cycle detection (simple)
+  const adj={};
+  PLANT.nodes.forEach(n=>adj[n.id]=[]);
+  PLANT.edges.forEach(e=>{if(adj[e.src])adj[e.src].push(e.tgt)});
+  if(issues.length){
+    dot.style.background='var(--amber)';
+    txt.textContent=issues[0]+(issues.length>1?` (+${issues.length-1} more)`:'');
+    txt.className='val-txt val-warn';
+  }else{
+    dot.style.background='var(--green)';
+    txt.textContent=`Network valid — ${PLANT.nodes.length} nodes, ${PLANT.edges.length} connections`;
+    txt.className='val-txt val-ok';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════ SIMULATION */
+async function runSimulation(){
+  if(!PLANT.nodes.some(n=>n.type==='cstr')){toast('Add at least one CSTR reactor.');return;}
+  setStatus('run','Syncing plant...');
+  document.getElementById('run-btn').disabled=true;
+
+  const t_end=parseFloat(document.getElementById('p-tend').value)||200;
+  const n_segs=parseInt(document.getElementById('p-segs').value)||8;
+  const pname=document.getElementById('p-name').value||'Plant';
+
+  // Build edge list with resolved labels and v2 config (pump_efficiency, not inlet_pressure_Pa)
+  const edgesWithLabels=PLANT.edges.map(e=>{
+    const src=PLANT.nodes.find(n=>n.id===e.src);
+    const tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+    const cfg={...e.config};
+    // Ensure pump_efficiency present, remove legacy inlet_pressure_Pa
+    if(!cfg.pump_efficiency) cfg.pump_efficiency=0.75;
+    delete cfg.inlet_pressure_Pa;
+    return{...e, config:cfg, src_label:src?.label||'', tgt_label:tgt?.label||''};
+  });
+
+  // Attach pressure_kPa to each node config for backend sync
+  const nodesWithPressure=PLANT.nodes.map(n=>({
+    ...n,
+    config:{
+      ...n.config,
+      pressure_kPa:n.config?.pressure_kPa||101.325,
+      pressure_mode:n.config?.pressure_mode||'atm',
+    }
+  }));
+
+  // Sync full plant state to backend
+  const syncR=await api('POST','/api/sync_plant',{
+    name:pname,
+    nodes:nodesWithPressure,
+    edges:edgesWithLabels,
+  });
+  if(syncR.status!=='ok'){
+    setStatus('err','Sync failed: '+(syncR.message||'unknown error'));
+    toast('Sync failed: '+(syncR.message||''));
+    document.getElementById('run-btn').disabled=false;
+    return;
+  }
+  toast(`Plant synced: ${syncR.data.n_reactors} reactor(s), ${syncR.data.n_connections} connection(s).`);
+
+  setStatus('run',`Simulating ${syncR.data.n_reactors} reactor(s)...`);
+  const r=await api('POST','/api/simulate',{t_end,n_segments:n_segs});
+  if(r.status==='ok'){
+    PLANT.result=r.data;
+    setStatus('ok',`Done — ${t_end}s simulated`);
+    // v2: update pump energy display
+    const pumpKW=(r.data.total_pump_kW||0).toFixed(3);
+    document.getElementById('energy-draw').textContent=pumpKW+' kW';
+    document.getElementById('energy-draw').style.color=parseFloat(pumpKW)>0.001?'var(--amber)':'var(--text-dim)';
+    // Pump breakdown toast
+    const pb=r.data.pressure_balance||{};
+    const pumpStates=pb.pump_states||{};
+    const pKeys=Object.keys(pumpStates);
+    if(pKeys.length){
+      const lines=pKeys.map(k=>{
+        const ps=pumpStates[k];
+        return`${k}: ${(ps.required_delta_p_kPa||0).toFixed(1)} kPa / ${(ps.shaft_power_kW||0).toFixed(3)} kW`;
+      });
+      toast(`Pump summary:\n${lines.join('\n')}`,5000);
+    }
+    // Run-dry badge
+    const rdBadge=document.getElementById('run-dry-badge');
+    const hasDry=(r.data.run_dry_reactors||[]).length>0;
+    rdBadge.style.display=hasDry?'':' none';
+    if(hasDry){toast('WARNING: Run-dry detected in '+r.data.run_dry_reactors.join(', ')+'. Use Auto-Balance to fix.',5000);}
+    else toast('Simulation complete.');
+    renderWorkspace();
+    renderContextPanel();
+  }else{
+    setStatus('err','Simulation failed');
+    toast('Simulation error: '+(r.message||'check Flask console'));
+  }
+  document.getElementById('run-btn').disabled=false;
+}
+
+async function loadExample(ex){
+  setStatus('run','Loading...');
+  const r=await api('POST','/api/build_example',{example:ex});
+  if(r.status!=='ok'){
+    toast('Failed to load example: '+(r.message||''));
+    setStatus('err','Load failed');
+    return;
+  }
+
+  // Pull topology from backend and build local PLANT state
+  const topo=await api('GET','/api/topology');
+  if(topo.status!=='ok'){
+    toast('Failed to load topology: '+(topo.message||''));
+    setStatus('err','Topology error');
+    return;
+  }
+
+  PLANT.nodes=[];PLANT.edges=[];_nodeCounter=0;_edgeCounter=0;PLANT.result=null;
+  const W=svg.clientWidth||700,H=svg.clientHeight||400;
+  const ns=topo.data.nodes;
+  const spacing=Math.min(180,(W-160)/Math.max(ns.length,1));
+  ns.forEach((n,i)=>{
+    const x=90+i*spacing;
+    const y=H/2+(i%2===0?-30:30);
+    PLANT.nodes.push({id:nodeId(),type:n.node_type||'cstr',label:n.id,x,y,config:{
+      volume_L:n.volume_L||200,
+      pressure_kPa:n.pressure_kPa||101.325,
+      pressure_mode:n.pressure_mode||'atm',
+      species:[],reactions:[],feeds:[],
+      temperature:{mode:'isothermal',T_kelvin:298.15}
+    }});
+  });
+  topo.data.edges.forEach(e=>{
+    const src=PLANT.nodes.find(n=>n.label===e.source);
+    const tgt=PLANT.nodes.find(n=>n.label===e.target);
+    if(src&&tgt)PLANT.edges.push({id:edgeId(),src:src.id,tgt:tgt.id,
+      config:{
+        length:e.length_m||10,diameter:e.diameter_m||0.05,
+        flow_rate_m3s:(e.flow_Ls||0.5)/1000,
+        pump_efficiency:e.pump_efficiency_pct?e.pump_efficiency_pct/100:0.75
+      }});
+  });
+
+  setStatus('ok',`${ex} example loaded — click Run Simulation`);
+  toast(`${ex} example loaded.`);
+  renderWorkspace();renderContextPanel();
+}
+
+/* ════════════════════════════════════════════════════════════ AUTO BALANCE v2 */
+async function autoBalance(){
+  setStatus('run','Running auto-balance...');
+  const t_end=parseFloat(document.getElementById('p-tend').value)||300;
+  const n_segs=parseInt(document.getElementById('p-segs').value)||12;
+
+  // First sync the plant state, then call the real auto_balance solver
+  const pname=document.getElementById('p-name').value||'Plant';
+  const edgesWithLabels=PLANT.edges.map(e=>{
+    const src=PLANT.nodes.find(n=>n.id===e.src);
+    const tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+    const cfg={...e.config};
+    if(!cfg.pump_efficiency) cfg.pump_efficiency=0.75;
+    delete cfg.inlet_pressure_Pa;
+    return{...e,config:cfg,src_label:src?.label||'',tgt_label:tgt?.label||''};
+  });
+  const nodesWithPressure=PLANT.nodes.map(n=>({
+    ...n,config:{...n.config,
+      pressure_kPa:n.config?.pressure_kPa||101.325,
+      pressure_mode:n.config?.pressure_mode||'atm',
+    }
+  }));
+  const syncR=await api('POST','/api/sync_plant',{name:pname,nodes:nodesWithPressure,edges:edgesWithLabels});
+  if(syncR.status!=='ok'){
+    setStatus('err','Sync failed');toast('Sync failed: '+(syncR.message||''));return;
+  }
+
+  const r=await api('POST','/api/auto_balance',{t_end,n_segments:n_segs,max_iter:8});
+  if(r.status==='ok'){
+    PLANT.result=r.data;
+    const kw=(r.data.total_pump_kW||0).toFixed(3);
+    document.getElementById('energy-draw').textContent=kw+' kW';
+
+    // Sync corrected pipe flows back into PLANT.edges
+    if(r.data.connection_diags){
+      PLANT.edges.forEach(e=>{
+        const src=PLANT.nodes.find(n=>n.id===e.src);
+        const tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+        const key=`${src?.label}→${tgt?.label}`;
+        const diag=r.data.connection_diags[key];
+        if(diag&&diag.flow_rate_Ls!=null){
+          e.config.flow_rate_m3s=diag.flow_rate_Ls/1000;
+        }
+      });
+    }
+
+    const log=r.data.balance_log||[];
+    const converged=r.data.converged;
+    const stillDry=r.data.still_dry||[];
+    if(converged){
+      setStatus('ok',`Auto-balance converged in ${r.data.iterations} pass(es)`);
+      toast(`✓ Auto-balance complete — all reactors balanced.\n${log.slice(-3).join('\n')}`,5000);
+    }else{
+      setStatus('err',`Auto-balance: ${stillDry.length} reactor(s) still dry`);
+      toast(`Auto-balance made progress but ${stillDry.join(', ')} still in error.\nCheck feed flow rates.\n${log.slice(-3).join('\n')}`,7000);
+    }
+    renderWorkspace();renderContextPanel();
+  }else{
+    setStatus('err','Auto-balance failed');
+    toast('Auto-balance error: '+(r.message||'check Flask console'));
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════ INSPECTOR */
+function openInspector(id){
+  const nodeId=id||UI.selected?.id;
+  if(!nodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===nodeId);
+  if(!node)return;
+  // v2: source/sink get the same config modal (now includes pressure field)
+  if(node.type==='cstr'){
+    UI.inspectorNodeId=nodeId;
+    openReactorModal(node);
+  }else{
+    UI.inspectorNodeId=nodeId;
+    openNodeConfigModal(node);
+  }
+}
+
+function openPipeInspector(eid){
+  const edgeId=eid||UI.selected?.id;
+  if(!edgeId)return;
+  const edge=PLANT.edges.find(e=>e.id===edgeId);
+  if(!edge)return;
+  UI.inspectorEdgeId=edgeId;
+  const src=PLANT.nodes.find(n=>n.id===edge.src);
+  const tgt=PLANT.nodes.find(n=>n.id===edge.tgt);
+  document.getElementById('p-modal-title').textContent=`Pipeline — ${src?.label||'?'} → ${tgt?.label||'?'}`;
+  const cfg=edge.config||{};
+  document.getElementById('pipe-len').value=cfg.length||10;
+  document.getElementById('pipe-dia').value=cfg.diameter||0.05;
+  document.getElementById('pipe-elev').value=cfg.elevation_change||0;
+  document.getElementById('pipe-k').value=cfg.n_fittings_K||2;
+  document.getElementById('pipe-flow').value=cfg.flow_rate_m3s||0.0005;
+  document.getElementById('pipe-eta').value=cfg.pump_efficiency||0.75;
+  renderHydTable(edge);
+  // Clear old plots
+  ['sweep','pump','regime','fanning'].forEach(tab=>{
+    const img=document.getElementById(`pipe-${tab}-img`);
+    const ph=document.getElementById(`pipe-${tab}-placeholder`);
+    if(img){img.style.display='none';img.src='';}
+    if(ph){ph.style.display='';ph.textContent=tab==='sweep'?'Click Load Plots to generate.':'Load plots first.';}
+  });
+  openModal('pipe-modal');
+}
+
+async function runPipePlots(){
+  if(!UI.inspectorEdgeId)return;
+  const edge=PLANT.edges.find(e=>e.id===UI.inspectorEdgeId);
+  if(!edge)return;
+  const src=PLANT.nodes.find(n=>n.id===edge.src);
+  const tgt=PLANT.nodes.find(n=>n.id===edge.tgt);
+  const cname=encodeURIComponent(`${src?.label}→${tgt?.label}`);
+
+  // First apply any pending changes
+  _savePipeConfig(edge);
+
+  const btn=document.querySelector('#pipe-tab-sweep button');
+  if(btn){btn.disabled=true;btn.textContent='Loading...';}
+
+  const r=await api('GET',`/api/pipe_plot/${cname}`);
+  if(btn){btn.disabled=false;btn.textContent='Load Plots';}
+
+  if(r.status!=='ok'){toast('Plot failed: '+(r.message||''));return;}
+  const d=r.data;
+
+  const plotMap={sweep:'sweep_plot',pump:'pump_curve',regime:'regime_map',fanning:'fanning_plot'};
+  Object.entries(plotMap).forEach(([tab,key])=>{
+    const img=document.getElementById(`pipe-${tab}-img`);
+    const ph=document.getElementById(`pipe-${tab}-placeholder`);
+    if(d[key]&&img){
+      img.src=d[key];img.style.display='block';
+      if(ph)ph.style.display='none';
+    }
+  });
+
+  // Update hyd table with fresh pump data
+  if(d.pump){
+    const tb=document.getElementById('hyd-table');
+    const p=d.pump;
+    const nodeP=d.node_pressures||{};
+    const srcP=nodeP[src?.label]||101.325;
+    const tgtP=nodeP[tgt?.label]||101.325;
+    const regimeCls={'turbulent':'good','laminar':'warn','transitional':'warn'}[p.regime||'']||'';
+    const rows=[
+      ['Src node P',`${srcP.toFixed(1)} kPa`,'val'],
+      ['Tgt node P',`${tgtP.toFixed(1)} kPa`,'val'],
+      ['Pipe ΔP',`${(p.pipe_pressure_drop_kPa||0).toFixed(2)} kPa`,'val'],
+      ['Pump ΔP',`${(p.required_delta_p_kPa||0).toFixed(2)} kPa`,p.feasible===false?'warn':'good'],
+      ['Pump Power',`${(p.shaft_power_kW||0).toFixed(4)} kW`,'val'],
+      ['Efficiency',`${((p.efficiency_pct)||75).toFixed(0)}%`,'val'],
+      ['Velocity',`${(p.velocity_m_s||0).toFixed(3)} m/s`,'val'],
+      ['Reynolds',`${(p.reynolds_number||0).toFixed(0)}`,'val'],
+      ['Regime',p.regime||'—',regimeCls],
+      ['Darcy f',`${(p.friction_factor_darcy||0).toFixed(5)}`,'val'],
+      ['Fanning f',`${(p.friction_factor_fanning||0).toFixed(5)}`,'val'],
+      ['Head loss',`${(p.head_loss_m||0).toFixed(2)} m`,'val'],
+    ];
+    const flags=[];
+    if(d.spec?.roughness_default)flags.push('⚠ roughness = steel default');
+    if(d.fluid?.density_default)flags.push('⚠ density = water default');
+    const flagRow=flags.length?`<tr><td colspan="2" style="color:var(--amber);font-family:var(--mono);font-size:10px">${flags.join('  |  ')}</td></tr>`:'';
+    tb.innerHTML=`<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${
+      rows.map(([k,v,cls])=>`<tr><td>${k}</td><td class="${cls||''}">${v}</td></tr>`).join('')
+    }${flagRow}</tbody>`;
+  }
+  toast('Plots loaded.');
+}
+
+function _savePipeConfig(edge){
+  if(!edge)return;
+  edge.config={
+    length:parseFloat(document.getElementById('pipe-len').value)||10,
+    diameter:parseFloat(document.getElementById('pipe-dia').value)||0.05,
+    elevation_change:parseFloat(document.getElementById('pipe-elev').value)||0,
+    n_fittings_K:parseFloat(document.getElementById('pipe-k').value)||2,
+    flow_rate_m3s:parseFloat(document.getElementById('pipe-flow').value)||5e-4,
+    pump_efficiency:parseFloat(document.getElementById('pipe-eta').value)||0.75,
+  };
+}
+function applyPipeChanges(){
+  if(!UI.inspectorEdgeId)return;
+  const edge=PLANT.edges.find(e=>e.id===UI.inspectorEdgeId);
+  if(!edge)return;
+  _savePipeConfig(edge);
+  renderWorkspace();toast('Pipeline updated. Re-run simulation for new hydraulics.');
+}
+
+function renderHydTable(edge){
+  const src=PLANT.nodes.find(n=>n.id===edge.src);
+  const tgt=PLANT.nodes.find(n=>n.id===edge.tgt);
+  const key=`${src?.label}→${tgt?.label}`;
+  const diag=PLANT.result?.connection_diags?.[key];
+  const tb=document.getElementById('hyd-table');
+  if(!diag){
+    tb.innerHTML='<tbody><tr><td colspan="2" style="color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:10px">Run simulation or click Load Plots for hydraulics.</td></tr></tbody>';
+    return;
+  }
+  const feasCls=diag.pump_feasible===false?'warn':'good';
+  const regimeCls={'turbulent':'good','laminar':'warn','transitional':'warn'}[diag.flow_regime||'']||'';
+  const rows=[
+    ['Pump ΔP',`${(diag.pump_delta_p_kPa||diag.pressure_drop_kPa||0).toFixed(2)} kPa`,feasCls],
+    ['Pump Power',`${(diag.pump_power_kW||diag.compressor_kW||0).toFixed(4)} kW`,'val'],
+    ['Pump η',`${((diag.pump_efficiency_pct)||75).toFixed(0)}%`,'val'],
+    ['Pipe ΔP',`${(diag.pipe_pressure_drop_kPa||diag.pressure_drop_kPa||0).toFixed(2)} kPa`,'val'],
+    ['Velocity',`${(diag.velocity_m_s||0).toFixed(3)} m/s`,'val'],
+    ['Reynolds',`${(diag.reynolds_number||0).toFixed(0)}`,'val'],
+    ['Regime',diag.flow_regime||'—',regimeCls],
+    ['Darcy f',`${(diag.friction_factor_darcy||0).toFixed(5)}`,'val'],
+    ['Head loss',`${(diag.head_loss_m||0).toFixed(2)} m`,'val'],
+  ];
+  const flags=[];
+  if(diag.roughness_default)flags.push('⚠ roughness = steel default');
+  if(diag.density_default) flags.push('⚠ density = water default');
+  const flagRow=flags.length?`<tr><td colspan="2" style="color:var(--amber);font-family:var(--mono);font-size:10px;padding:4px 6px">${flags.join('  |  ')}</td></tr>`:'';
+  tb.innerHTML=`<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${
+    rows.map(([k,v,cls])=>`<tr><td>${k}</td><td class="${cls||''}">${v}</td></tr>`).join('')
+  }${flagRow}</tbody>`;
+}
+
+// runFlowSweep removed in v2 — replaced by runPipePlots()
+
+function switchPipeTab(name){
+  ['sweep','pump','regime','fanning'].forEach(t=>{
+    const el=document.getElementById(`pipe-tab-${t}`);
+    if(el)el.style.display=t===name?'flex':'none';
+  });
+}
+// v2: drawFlowSweep and drawPressureChart removed — all pipe plots now served
+// as matplotlib PNGs from /api/pipe_plot/<name> via runPipePlots().
+// Canvas-based sweep replaced by image display in updated pipe modal tabs.
+
+
+
+/* ════════════════════════════════════════════════════════════ REACTOR MODAL */
+function openReactorModal(node){
+  const cfg=node.config||{};
+  document.getElementById('r-modal-title').textContent=`Reactor — ${node.label}`;
+  document.getElementById('r-modal-sub').textContent=`V=${cfg.volume_L||200}L`;
+  document.getElementById('r-name').value=node.label;
+  document.getElementById('r-vol').value=cfg.volume_L||200;
+  // Temperature
+  const tmode=(cfg.temperature?.mode)||'isothermal';
+  UI.rTMode=tmode==='isothermal'?'constant':tmode;
+  setRTMode(UI.rTMode);
+  document.getElementById('r-t0').value=cfg.temperature?.T_kelvin||298.15;
+  document.getElementById('r-tf').value=cfg.temperature?.T_final||340;
+  document.getElementById('r-ts').value=cfg.temperature?.t_step||100;
+  // Result stats
+  const rr=PLANT.result?.reactor_results?.[node.label];
+  if(rr){
+    document.getElementById('r-tau').textContent=rr.residence_time_s?rr.residence_time_s.toFixed(1)+'s':'—';
+    const convs=Object.entries(rr.conversion||{}).map(([k,v])=>`${k}:${(v*100).toFixed(1)}%`).join(' ');
+    document.getElementById('r-conv').textContent=convs||'—';
+    document.getElementById('r-flow').textContent=rr.inlet_flow_m3s?(rr.inlet_flow_m3s*1e3).toFixed(3)+' L/s':'—';
+    document.getElementById('r-status').textContent=rr.converged?'Converged':'Not converged';
+    document.getElementById('r-status').style.color=rr.converged?'var(--green)':'var(--red)';
+  }
+  renderRFeeds(cfg,node.id);renderRSpecies(cfg);renderRReactions(cfg);renderROutlet(node.label);
+  renderRConnections(node.id);
+  // Clear old conc table if reopening
+  const oldTbl=document.getElementById('conc-num-table');if(oldTbl)oldTbl.remove();
+  UI.tlData=buildTLData(node.label);
+  UI.tlFrame=0;UI.tlPlaying=false;
+  updateTL();drawRConcCanvas();
+  openModal('reactor-modal');
+  // Async: fetch full time-series with conc_table from server
+  if(PLANT.result){
+    loadReactorPlotData(node.label).then(fullData=>{
+      if(fullData){UI.tlData=fullData;updateTL();drawRConcCanvas();}
+    });
+  }
+}
+
+function buildTLData(rLabel){
+  // First check local PLANT result for quick data
+  const rr=PLANT.result?.reactor_results?.[rLabel];
+  if(!rr?.time?.length)return null;
+  // Use full time+conc arrays; these are populated by /api/reactor_plot
+  return{time:rr.time, conc:rr.concentrations, names:rr.species_names||Object.keys(rr.outlet_composition||{})};
+}
+
+async function loadReactorPlotData(rLabel){
+  // Fetch full time-series including conc_table from API
+  const r=await api('GET',`/api/reactor_plot/${encodeURIComponent(rLabel)}`);
+  if(r.status!=='ok')return null;
+  const d=r.data;
+  // Cache trajectory image
+  const imgEl=document.getElementById('r-trajectory-img');
+  if(imgEl&&d.trajectory){imgEl.src=d.trajectory;imgEl.style.display='block';}
+  // Return data for timeline
+  if(!d.time?.length)return null;
+  return{time:d.time, conc:d.conc, names:d.species||[], conc_table:d.conc_table||[]};
+}
+
+function renderRFeeds(cfg, nodeId){
+  const el=document.getElementById('r-feeds-list');
+  const feeds=[...(cfg.feeds||[])];
+
+  // Also show feeds implied by connected source nodes
+  if(nodeId){
+    const node=PLANT.nodes.find(n=>n.id===nodeId);
+    if(node){
+      PLANT.edges.forEach(e=>{
+        if(e.tgt!==node.id)return;
+        const srcNode=PLANT.nodes.find(n=>n.id===e.src);
+        if(!srcNode||srcNode.type!=='source')return;
+        // Check not already in feeds list
+        const alreadyListed=feeds.some(f=>f.name===srcNode.label);
+        if(!alreadyListed){
+          feeds.push({
+            name:srcNode.label,
+            flow_rate_m3s:srcNode.config?.flow_rate_m3s||5e-4,
+            species:srcNode.config?.species||{},
+            _fromSource:true
+          });
+        }
+      });
+    }
+  }
+
+  if(!feeds.length){
+    el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:4px">No feeds configured.<br>Connect a Source node or add a feed stream below.</div>';
+    return;
+  }
+  el.innerHTML=feeds.map((f,i)=>{
+    const spText=Object.entries(f.species||{}).map(([k,v])=>`${k}:${v}`).join(' ');
+    const tag=f._fromSource
+      ?`<span style="font-size:9px;color:var(--teal);font-family:var(--mono);border:1px solid var(--teal);border-radius:2px;padding:0 4px">SOURCE</span>`
+      :`<span style="font-size:9px;color:var(--text-dim);font-family:var(--mono)">FEED</span>`;
+    return`<div class="obj-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+      <div style="display:flex;align-items:center;gap:6px;width:100%">
+        ${tag}
+        <span class="obj-label">${esc(f.name||'feed_'+i)}</span>
+        <span class="obj-dir">${((f.flow_rate_m3s||0)*1e3).toFixed(3)} L/s</span>
+        ${f._fromSource?'':`<button class="xbtn" onclick="removeFeed(${i})">x</button>`}
+      </div>
+      ${spText?`<div style="font-family:var(--mono);font-size:10px;color:var(--teal);padding-left:2px">${esc(spText)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderRSpecies(cfg){
+  const el=document.getElementById('r-species-list');
+  const sps=cfg.species||[];
+  el.innerHTML=sps.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:7px;padding:4px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;margin-bottom:3px">
+      <span class="sp-badge" style="background:${clr(i)}"></span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-bright);flex:1">${esc(s.name)}</span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--amber)">${s.initial} M</span>
+    </div>`).join('');
+}
+
+function renderRReactions(cfg){
+  const el=document.getElementById('r-rxns-list');
+  const rxns=cfg.reactions||[];
+  if(!rxns.length){
+    el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:4px">No reactions defined.</div>';
+    return;
+  }
+  el.innerHTML=rxns.map((r,i)=>`
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:4px" id="rxn-row-${i}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:${clr(i)};min-width:16px">${i+1}.</span>
+        <input class="fi" id="rxn-r-${i}" value="${esc(r.reactants)}" style="width:70px;font-size:10px" title="Reactants (space-separated)">
+        <span style="color:var(--text-dim);font-family:var(--mono)">→</span>
+        <input class="fi" id="rxn-p-${i}" value="${esc(r.products)}" style="width:70px;font-size:10px" title="Products (space-separated)">
+        <button class="xbtn" onclick="removeReaction(${i})" title="Delete reaction">×</button>
+      </div>
+      <div style="display:flex;gap:6px;padding-left:22px">
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">k=</span>
+          <input class="fi" id="rxn-k-${i}" type="number" value="${r.rate||0.05}" step="0.001" style="width:72px;font-size:10px" title="Rate constant k">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Ea=</span>
+          <input class="fi" id="rxn-ea-${i}" type="number" value="${r.activation_energy||0}" step="500" style="width:72px;font-size:10px" title="Activation energy J/mol">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">A=</span>
+          <input class="fi" id="rxn-a-${i}" type="number" value="${r.pre_exponential||0}" step="1e4" style="width:80px;font-size:10px" title="Pre-exponential factor">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function removeReaction(i){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  if(!node||!node.config.reactions)return;
+  node.config.reactions.splice(i,1);
+  renderRReactions(node.config);
+  toast('Reaction removed.');
+}
+
+function collectReactionsFromUI(cfg){
+  /* Read back all editable reaction fields into cfg.reactions */
+  const rxns=cfg.reactions||[];
+  rxns.forEach((r,i)=>{
+    const rEl=document.getElementById(`rxn-r-${i}`);
+    const pEl=document.getElementById(`rxn-p-${i}`);
+    const kEl=document.getElementById(`rxn-k-${i}`);
+    const eaEl=document.getElementById(`rxn-ea-${i}`);
+    const aEl=document.getElementById(`rxn-a-${i}`);
+    if(rEl) r.reactants=rEl.value.trim();
+    if(pEl) r.products=pEl.value.trim();
+    if(kEl) r.rate=parseFloat(kEl.value)||r.rate;
+    if(eaEl) r.activation_energy=parseFloat(eaEl.value)||0;
+    if(aEl)  r.pre_exponential=parseFloat(aEl.value)||0;
+  });
+  return rxns;
+}
+
+function renderROutlet(rLabel){
+  const el=document.getElementById('r-outlet-content');
+  const rr=PLANT.result?.reactor_results?.[rLabel];
+  if(!rr){el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">Run simulation to view outlet composition.</div>';return;}
+  const oc=rr.outlet_composition||{};
+  el.innerHTML=`<table class="res-table" style="width:100%">
+    <thead><tr><th>Species</th><th>Outlet (M)</th><th>Conversion</th></tr></thead>
+    <tbody>${Object.entries(oc).map(([sp,v],i)=>{
+      const conv=rr.conversion?.[sp];
+      return`<tr>
+        <td><span class="sp-badge" style="background:${clr(i)}"></span>${esc(sp)}</td>
+        <td style="color:var(--amber);font-family:var(--mono)">${v.toFixed(4)}</td>
+        <td style="color:var(--teal);font-family:var(--mono)">${conv!=null?(conv*100).toFixed(1)+'%':'—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function inspectorApply(){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  if(!node)return;
+
+  // Save volume + temperature
+  node.label=document.getElementById('r-name').value||node.label;
+  node.config.volume_L=parseFloat(document.getElementById('r-vol').value)||200;
+  node.config.temperature=getCurrentTProfile();
+
+  // Collect edited reaction state from inline inputs before closing
+  if(node.config.reactions){
+    node.config.reactions=collectReactionsFromUI(node.config);
+  }
+
+  toast('Changes saved — click Run Simulation to apply.');
+  renderWorkspace();renderContextPanel();
+}
+
+function getCurrentTProfile(){
+  const T0=parseFloat(document.getElementById('r-t0').value)||298.15;
+  const Tf=parseFloat(document.getElementById('r-tf').value)||340;
+  const Ts=parseFloat(document.getElementById('r-ts').value)||100;
+  if(UI.rTMode==='constant')return{mode:'isothermal',T_kelvin:T0};
+  if(UI.rTMode==='ramp')return{mode:'ramp',T_kelvin:T0,T_final:Tf};
+  return{mode:'step',T_kelvin:T0,T_final:Tf,t_step:Ts};
+}
+
+function addFeedToReactor(){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  const name=document.getElementById('r-fn').value.trim()||'feed';
+  const flow=parseFloat(document.getElementById('r-fq').value)||5e-4;
+  const spStr=document.getElementById('r-fsp').value.trim();
+  const species={};
+  spStr.split(/\s+/).forEach(pair=>{const[k,v]=pair.split(':');if(k&&v)species[k]=parseFloat(v)||0;});
+  if(!node.config.feeds)node.config.feeds=[];
+  node.config.feeds.push({name,flow_rate_m3s:flow,species});
+  renderRFeeds(node.config, node.id);toggleAddForm('r-add-feed');toast('Feed added.');
+}
+function removeFeed(i){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  node.config.feeds?.splice(i,1);renderRFeeds(node.config, node.id);
+}
+function addSpeciesToReactor(){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  const name=document.getElementById('r-spn').value.trim();
+  const init=parseFloat(document.getElementById('r-spi').value)||0;
+  if(!name){toast('Enter species name.');return;}
+  if(!node.config.species)node.config.species=[];
+  node.config.species.push({name,initial:init});
+  renderRSpecies(node.config);toggleAddForm('r-add-sp');toast('Species added.');
+}
+function addReactionToReactor(){
+  if(!UI.inspectorNodeId)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  const rr=document.getElementById('r-rr').value.trim();
+  const rp=document.getElementById('r-rp').value.trim();
+  const k=parseFloat(document.getElementById('r-rk').value)||0.05;
+  const ea=parseFloat(document.getElementById('r-rea').value)||0;
+  const a=parseFloat(document.getElementById('r-ra').value)||0;
+  if(!rr||!rp){toast('Enter reactants and products.');return;}
+  if(!node.config.reactions)node.config.reactions=[];
+  node.config.reactions.push({reactants:rr,products:rp,rate:k,activation_energy:ea,pre_exponential:a});
+  renderRReactions(node.config);toggleAddForm('r-add-rxn');toast('Reaction added.');
+}
+
+/* ════════════════════════════════════════════════════════════════ TIMELINE */
+function updateTL(){
+  const data=UI.tlData;
+  const n=data?.time?.length||0;
+  const f=Math.min(UI.tlFrame,n-1);
+  const t=data?data.time[f]:0;
+  const tEnd=data?data.time[n-1]:200;
+  document.getElementById('tl-t').textContent=`t = ${t?.toFixed?.(1)||0}`;
+  document.getElementById('tl-s1').textContent=tEnd?.toFixed?.(0)||200;
+  const pct=n>1?(f/(n-1))*100:0;
+  document.getElementById('tl-fill').style.width=pct+'%';
+  document.getElementById('tl-thumb').style.left=pct+'%';
+  drawRConcCanvas();drawRTCanvas();
+  drawConcTable(f);  // v2: show numeric concentrations at current time step
+}
+
+function drawConcTable(frameIdx){
+  // Find or create the concentration table below the canvas
+  let tbl=document.getElementById('conc-num-table');
+  if(!tbl){
+    const canvas=document.getElementById('r-conc-canvas');
+    if(!canvas)return;
+    tbl=document.createElement('div');
+    tbl.id='conc-num-table';
+    tbl.style.cssText='padding:5px 8px;font-family:var(--mono);font-size:11px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border);background:var(--surface)';
+    canvas.parentElement.after(tbl);
+  }
+  const data=UI.tlData;
+  if(!data||!data.conc||!data.names){tbl.innerHTML='';return;}
+  const row=data.conc[Math.min(frameIdx,data.conc.length-1)];
+  if(!row){tbl.innerHTML='';return;}
+  tbl.innerHTML=data.names.map((nm,i)=>{
+    const v=row[i]??0;
+    const col=COLORS[i%COLORS.length];
+    return`<div style="display:flex;align-items:center;gap:4px;padding:2px 7px;background:${col}18;border:1px solid ${col}55;border-radius:3px">
+      <span style="color:${col};font-weight:600">${esc(nm)}</span>
+      <span style="color:var(--text-bright)">${v.toFixed(4)} M</span>
+    </div>`;
+  }).join('');
+}
+
+function tlSeek(f){
+  UI.tlFrame=Math.max(0,Math.min(f,UI.tlData?.time?.length-1||0));
+  updateTL();
+}
+function tlStep(d){tlSeek(UI.tlFrame+d);}
+function tlTogglePlay(){
+  UI.tlPlaying=!UI.tlPlaying;
+  document.getElementById('tl-play-btn').textContent=UI.tlPlaying?'||':'>';
+  if(UI.tlPlaying)tlTick();
+}
+function tlTick(){
+  if(!UI.tlPlaying)return;
+  const spd=parseFloat(document.getElementById('tl-speed').value)||1;
+  UI.tlFrame+=Math.ceil(spd*2);
+  const n=UI.tlData?.time?.length||1;
+  if(UI.tlFrame>=n-1){UI.tlFrame=n-1;UI.tlPlaying=false;document.getElementById('tl-play-btn').textContent='>';}
+  updateTL();
+  if(UI.tlPlaying)requestAnimationFrame(tlTick);
+}
+// Rail scrub
+document.getElementById('tl-rail').addEventListener('click',e=>{
+  const r=e.currentTarget.getBoundingClientRect();
+  const f=Math.floor(((e.clientX-r.left)/r.width)*(UI.tlData?.time?.length-1||0));
+  tlSeek(f);
+});
+
+/* ══════════════════════════════════════════════════════════ CONC CANVAS */
+function drawRConcCanvas(){
+  const can=document.getElementById('r-conc-canvas');
+  const W=can.parentElement.clientWidth-12||380;
+  const H=220;can.width=W;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const data=UI.tlData;
+  if(!data||!data.time?.length){
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code,monospace';ctx.textAlign='center';
+    ctx.fillText('Run simulation to see trajectories.',W/2,H/2);return;
+  }
+  const P={l:46,r:12,t:12,b:26};
+  const pw=W-P.l-P.r,ph=H-P.t-P.b;
+  let cMax=0;data.conc.forEach(r=>r.forEach(v=>{if(v>cMax)cMax=v;}));
+  cMax=cMax*1.06||1;
+  const tMin=data.time[0],tMax=data.time[data.time.length-1],tR=tMax-tMin||1;
+  const tx=t=>P.l+(t-tMin)/tR*pw;
+  const ty=c=>P.t+ph-(c/cMax)*ph;
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#182a40';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const c=(i/4)*cMax,y=ty(c);
+    ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(W-P.r,y);ctx.stroke();
+    ctx.fillStyle='#3a5472';ctx.font='8px Fira Code,monospace';ctx.textAlign='right';
+    ctx.fillText(c.toFixed(c<10?1:0),P.l-3,y+3);
+  }
+  ctx.setLineDash([]);
+  data.names.forEach((nm,si)=>{
+    const c=COLORS[si%COLORS.length];
+    ctx.strokeStyle=c;ctx.lineWidth=2;ctx.shadowColor=c;ctx.shadowBlur=4;
+    ctx.beginPath();
+    data.time.forEach((t,ti)=>{
+      const x=tx(t),y=ty(data.conc[ti][si]);
+      ti?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    });
+    ctx.stroke();ctx.shadowBlur=0;
+    ctx.fillStyle=c;ctx.font='9px Fira Code,monospace';ctx.textAlign='left';
+    const lastY=ty(data.conc[data.conc.length-1][si]);
+    ctx.fillText(nm,W-P.r+2,Math.max(P.t+8,Math.min(H-P.b,lastY)));
+  });
+  // Playhead
+  if(UI.tlData&&UI.tlFrame<data.time.length){
+    const x=tx(data.time[UI.tlFrame]);
+    ctx.strokeStyle='rgba(240,160,48,.5)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(x,P.t);ctx.lineTo(x,P.t+ph);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // Legend
+  ctx.font='9px Fira Code,monospace';ctx.textAlign='left';
+  data.names.forEach((nm,si)=>{
+    ctx.fillStyle=COLORS[si%COLORS.length];
+    ctx.fillText(nm,P.l+5+si*45,P.t+8);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════ T CANVAS */
+function setRTMode(mode){
+  UI.rTMode=mode;
+  ['const','ramp','step'].forEach(m=>{
+    document.getElementById('tt-'+m)?.classList.toggle('active',m===mode||(mode==='constant'&&m==='const'));
+  });
+  const showFinal=mode==='ramp'||mode==='step';
+  const showStep=mode==='step';
+  document.getElementById('r-tf-label').style.display=showFinal?'':'none';
+  document.getElementById('r-tf').style.display=showFinal?'':'none';
+  document.getElementById('r-ts-label').style.display=showStep?'':'none';
+  document.getElementById('r-ts').style.display=showStep?'':'none';
+  drawRTCanvas();
+}
+
+function updateTProfile(){drawRTCanvas();}
+
+function drawRTCanvas(){
+  const can=document.getElementById('r-t-canvas');
+  const W=can.parentElement.clientWidth-16||340;can.width=W;can.height=72;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#090e1a';ctx.fillRect(0,0,W,72);
+  const T0=parseFloat(document.getElementById('r-t0')?.value)||298.15;
+  const Tf=parseFloat(document.getElementById('r-tf')?.value)||340;
+  const Ts=parseFloat(document.getElementById('r-ts')?.value)||100;
+  const t_end=parseFloat(document.getElementById('p-tend').value)||200;
+  const mode=UI.rTMode;
+  const N=200;
+  const Ts_arr=Array.from({length:N+1},(_,i)=>{
+    const t=(i/N)*t_end;
+    if(mode==='constant')return T0;
+    if(mode==='ramp')return T0+(Tf-T0)*(t/t_end);
+    if(mode==='step')return t>=Ts?Tf:T0;
+    return T0;
+  });
+  const Tlo=Math.min(...Ts_arr)-3,Thi=Math.max(...Ts_arr)+3;
+  const Tr=Math.max(Thi-Tlo,1);
+  const P={l:38,r:5,t:5,b:16};const pw=W-P.l-P.r,ph=72-P.t-P.b;
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#1c2d47';ctx.lineWidth=1;
+  for(let i=0;i<=3;i++){
+    const y=P.t+(i/3)*ph;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(W-P.r,y);ctx.stroke();
+    ctx.fillStyle='#3a5472';ctx.font='7px Fira Code,monospace';ctx.textAlign='right';
+    ctx.fillText((Thi-(i/3)*Tr).toFixed(0),P.l-2,y+3);
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle='#f0a030';ctx.lineWidth=2;ctx.shadowColor='#f0a030';ctx.shadowBlur=4;
+  ctx.beginPath();
+  Ts_arr.forEach((T,i)=>{
+    const x=P.l+(i/N)*pw,y=P.t+ph-((T-Tlo)/Tr)*ph;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();ctx.shadowBlur=0;
+  ctx.fillStyle='#3a5472';ctx.font='7px Fira Code,monospace';ctx.textAlign='center';
+  [0,.5,1].forEach(f=>ctx.fillText((f*t_end).toFixed(0),P.l+f*pw,72-2));
+}
+
+// Interactive T canvas click
+document.getElementById('r-t-canvas')?.addEventListener('click',e=>{
+  if(UI.rTMode!=='constant')return;
+  const can=document.getElementById('r-t-canvas');
+  const rect=can.getBoundingClientRect();
+  const yf=(e.clientY-rect.top)/rect.height;
+  const T=Math.round(450-yf*200);
+  document.getElementById('r-t0').value=T;
+  drawRTCanvas();
+});
+
+/* ════════════════════════════════════════════════════════ NODE CONFIG MODAL */
+function openNodeConfigModal(node){
+  document.getElementById('nc-title').textContent=`Configure — ${node.label} [${node.type.toUpperCase()}]`;
+  UI.inspectorNodeId=node.id;
+  const cfg=node.config||{};
+  const P_kPa=cfg.pressure_kPa||101.325;
+  const P_mode=cfg.pressure_mode||'atm';
+
+  // Pressure row common to all node types
+  const pressureRow=`
+    <div style="margin-bottom:10px;padding:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px">
+      <div class="ctx-label" style="margin-bottom:5px">Operating Pressure</div>
+      <div class="fr">
+        <span class="fl">Pressure (kPa)</span>
+        <input class="fi" id="nc-pressure" type="number" value="${P_kPa.toFixed(2)}" step="1" min="0">
+      </div>
+      ${P_mode==='atm'?`<div style="font-family:var(--mono);font-size:10px;color:var(--amber);margin-top:4px">⚠ Pressure not set — using atmospheric default. Set explicitly for accurate pump sizing.</div>`:''}
+    </div>`;
+
+  let html=pressureRow;
+
+  if(node.type==='source'){
+    html+=`<div class="fr" style="margin-bottom:8px"><span class="fl">Flow (L/s)</span>
+      <input class="fi" id="nc-flow" type="number" value="${((cfg.flow_rate_m3s||5e-4)*1e3).toFixed(3)}" step="0.001"></div>
+      <div class="ctx-label" style="margin-bottom:5px">Feed Composition  <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">(species: conc M)</span></div>
+      <div id="nc-sp-list">${Object.entries(cfg.species||{}).map(([k,v],i)=>`
+        <div class="obj-row">
+          <input class="fi" value="${esc(k)}" style="width:80px" id="nc-sp-name-${i}">
+          <input class="fi" type="number" value="${v}" style="width:70px" id="nc-sp-val-${i}">
+          <button class="xbtn" onclick="this.parentElement.remove()">×</button>
+        </div>`).join('')}</div>
+      <button class="btn sm teal" style="margin-top:6px" onclick="ncAddSpecies()">+ Species</button>`;
+  }else if(node.type==='sink'){
+    html+=`<div class="fr" style="margin-bottom:8px"><span class="fl">Flow (L/s)</span>
+      <input class="fi" id="nc-flow" type="number" value="${((cfg.flow_rate_m3s||5e-4)*1e3).toFixed(3)}" step="0.001"></div>
+      <div class="ctx-label" style="margin-bottom:5px">Min Product Concentrations</div>
+      <div id="nc-sp-list">${Object.entries(cfg.product_specs||{}).map(([k,v],i)=>`
+        <div class="obj-row">
+          <span class="obj-label" style="min-width:60px">${esc(k)}</span>
+          <input class="fi" type="number" value="${v}" style="width:70px" id="nc-sp-val-${i}">
+          <span class="obj-dir">M min</span>
+        </div>`).join('')}</div>
+      <div class="fr" style="margin-top:8px">
+        <input class="fi" id="nc-new-sp" placeholder="Species" style="width:90px">
+        <input class="fi" id="nc-new-val" type="number" value="0.5" style="width:60px">
+        <button class="btn sm teal" onclick="ncAddProductSpec()">+ Add</button>
+      </div>`;
+  }
+  document.getElementById('nc-body').innerHTML=html;
+  openModal('node-config-modal');
+}
+
+function ncAddSpecies(){
+  const list=document.getElementById('nc-sp-list');
+  const i=list.children.length;
+  const row=document.createElement('div');row.className='obj-row';
+  row.innerHTML=`<input class="fi" value="X" style="width:80px" id="nc-sp-name-${i}">
+    <input class="fi" type="number" value="1" style="width:70px" id="nc-sp-val-${i}">
+    <button class="xbtn" onclick="this.parentElement.remove()">x</button>`;
+  list.appendChild(row);
+}
+function ncAddProductSpec(){
+  const sp=document.getElementById('nc-new-sp')?.value.trim();
+  const v=parseFloat(document.getElementById('nc-new-val')?.value)||0.5;
+  if(!sp)return;
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+  if(node){if(!node.config.product_specs)node.config.product_specs={};node.config.product_specs[sp]=v;}
+  openNodeConfigModal(node);toast('Product spec added.');
+}
+
+function applyNodeConfig(){
+  const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);if(!node)return;
+  // Pressure applies to all node types
+  const P_kPa=parseFloat(document.getElementById('nc-pressure')?.value||101.325);
+  node.config.pressure_kPa=P_kPa;
+  node.config.pressure_mode='fixed';
+
+  if(node.type==='source'){
+    node.config.flow_rate_m3s=parseFloat(document.getElementById('nc-flow')?.value||0.5)/1000;
+    const sp={};
+    document.querySelectorAll('#nc-sp-list .obj-row').forEach((row,i)=>{
+      const k=row.querySelector(`#nc-sp-name-${i}`)?.value.trim();
+      const v=parseFloat(row.querySelector(`#nc-sp-val-${i}`)?.value)||0;
+      if(k)sp[k]=v;
+    });
+    node.config.species=sp;
+  }else if(node.type==='sink'){
+    node.config.flow_rate_m3s=parseFloat(document.getElementById('nc-flow')?.value||0.5)/1000;
+  }
+  closeModal('node-config-modal');
+  // Push pressure to backend immediately
+  api('POST',`/api/nodes/${encodeURIComponent(node.label)}/pressure`,{pressure_kPa:P_kPa})
+    .catch(()=>{});
+  renderWorkspace();renderContextPanel();toast('Configuration applied.');
+}
+
+/* ══════════════════════════════════════════════════════════════ OPTIMIZER */
+function openOptimizer(){
+  return; // NOTE TO REMOVE ONCE OPTIMIZER COMPLETED
+  if(!UI.optDVars.length){
+    PLANT.nodes.filter(n=>n.type==='cstr').forEach(n=>{
+      UI.optDVars.push({name:'V_'+n.label,variable_type:'reactor_volume',target:n.label,lower:50,upper:2000});
+    });
+  }
+  if(!UI.optObjectives.length){
+    const c=PLANT.nodes.find(n=>n.type==='cstr');
+    if(c){const sp=c.config?.species||[];const prod=sp.length>1?sp[sp.length-1].name:'B';
+      UI.optObjectives.push({type:'yield',reactor:c.label,species:prod,direction:'maximize'});
+      UI.optObjectives.push({type:'residence_time',reactor:c.label,direction:'minimize'});
+    }
+  }
+  renderDVarList();renderObjList();openModal('opt-modal');
+}
+function addDecisionVar(){
+  const c=PLANT.nodes.find(n=>n.type==='cstr');
+  UI.optDVars.push({name:'V_new',variable_type:'reactor_volume',target:c?.label||'',lower:50,upper:2000});
+  renderDVarList();
+}
+function addObjective(){
+  const c=PLANT.nodes.find(n=>n.type==='cstr');
+  const sp=c?.config?.species||[];const prod=sp.length>1?sp[sp.length-1].name:'B';
+  UI.optObjectives.push({type:'yield',reactor:c?.label||'',species:prod,direction:'maximize'});
+  renderObjList();
+}
+const _OPT_VTYPES=['reactor_volume','feed_flow','temperature','pipe_flow','pipe_diameter'];
+const _OPT_OTYPES=['yield','conversion','residence_time','compressor_power'];
+const _CSTR_LABELS=()=>PLANT.nodes.filter(n=>n.type==='cstr').map(n=>n.label);
+function renderDVarList(){
+  const el=document.getElementById('dv-list');
+  if(!UI.optDVars.length){el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;padding:8px">No decision variables. Click + to add.</div>';return;}
+  el.innerHTML=UI.optDVars.map((dv,i)=>{
+    const rtOpts=_CSTR_LABELS().map(l=>`<option value="${l}" ${dv.target===l?'selected':''}>${esc(l)}</option>`).join('');
+    const vtOpts=_OPT_VTYPES.map(t=>`<option value="${t}" ${dv.variable_type===t?'selected':''}>${t}</option>`).join('');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <input class="fi" value="${esc(dv.name)}" style="flex:1;font-size:10px" oninput="UI.optDVars[${i}].name=this.value">
+        <button class="xbtn" onclick="UI.optDVars.splice(${i},1);renderDVarList()">x</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">TYPE</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optDVars[${i}].variable_type=this.value">${vtOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">REACTOR</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optDVars[${i}].target=this.value">${rtOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">LOWER</div>
+          <input class="fi" type="number" value="${dv.lower}" style="font-size:10px" oninput="UI.optDVars[${i}].lower=+this.value"></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">UPPER</div>
+          <input class="fi" type="number" value="${dv.upper}" style="font-size:10px" oninput="UI.optDVars[${i}].upper=+this.value"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderObjList(){
+  const el=document.getElementById('obj-list');
+  if(!UI.optObjectives.length){el.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;padding:8px">No objectives. Click + to add.</div>';return;}
+  el.innerHTML=UI.optObjectives.map((o,i)=>{
+    const rtOpts=_CSTR_LABELS().map(l=>`<option value="${l}" ${o.reactor===l?'selected':''}>${esc(l)}</option>`).join('');
+    const otOpts=_OPT_OTYPES.map(t=>`<option value="${t}" ${o.type===t?'selected':''}>${t}</option>`).join('');
+    const needsSp=o.type==='yield'||o.type==='conversion';
+    const spList=PLANT.nodes.find(n=>n.label===o.reactor)?.config?.species||[];
+    const spOpts=spList.map(s=>`<option value="${s.name}" ${o.species===s.name?'selected':''}>${esc(s.name)}</option>`).join('');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--amber);flex:1">Objective ${i+1}</span>
+        <button class="xbtn" onclick="UI.optObjectives.splice(${i},1);renderObjList()">x</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">TYPE</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optObjectives[${i}].type=this.value;renderObjList()">${otOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">REACTOR</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optObjectives[${i}].reactor=this.value;renderObjList()">${rtOpts}</select></div>
+        ${needsSp?`<div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">SPECIES</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optObjectives[${i}].species=this.value">
+            ${spOpts||`<option value="${esc(o.species||'')}">${esc(o.species||'?')}</option>`}</select></div>`:''}
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:2px">DIRECTION</div>
+          <select class="fi" style="font-size:10px;padding:2px 4px" onchange="UI.optObjectives[${i}].direction=this.value">
+            <option value="maximize" ${o.direction==='maximize'?'selected':''}>Maximize</option>
+            <option value="minimize" ${o.direction==='minimize'?'selected':''}>Minimize</option>
+          </select></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function runOptimizer(){
+  if(!UI.optDVars.length||!UI.optObjectives.length){toast('Define decision variables and objectives first.');return;}
+  setStatus('run','Optimizing...');
+  document.getElementById('opt-run-btn').disabled=true;
+  const r=await api('POST','/api/optimize',{
+    decision_variables:UI.optDVars,objectives:UI.optObjectives,
+    method:document.getElementById('opt-method').value,
+    pop_size:parseInt(document.getElementById('opt-pop').value)||20,
+    n_gen:parseInt(document.getElementById('opt-gen').value)||10,
+    sim_t_end:parseFloat(document.getElementById('opt-tend').value)||200,
+    sim_n_segments:parseInt(document.getElementById('opt-segs').value)||6
+  });
+  document.getElementById('opt-run-btn').disabled=false;
+  if(r.status!=='ok'){setStatus('err','Optimization failed');toast(r.message||'Failed.');return;}
+  setStatus('ok','Optimization complete');toast('Optimization complete.');
+  drawParetoCanvas(r.data);drawConvCanvas(r.data);renderOptResults(r.data);
+}
+
+function drawParetoCanvas(data){
+  const can=document.getElementById('opt-pareto-canvas');
+  const W=can.parentElement.clientWidth-12||460;can.width=W;
+  const H=parseInt(can.getAttribute('height'))||360;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const pf=data?.pareto_F;
+  if(!pf||!pf.length){
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code,monospace';ctx.textAlign='center';
+    ctx.fillText('No Pareto data.',W/2,H/2);return;
+  }
+  if(pf[0]?.length===2){
+    const xs=pf.map(p=>p[0]),ys=pf.map(p=>p[1]);
+    const xMin=Math.min(...xs),xMax=Math.max(...xs)||xMin+1;
+    const yMin=Math.min(...ys),yMax=Math.max(...ys)||yMin+1;
+    const P={l:50,r:16,t:14,b:30};const pw=W-P.l-P.r,ph=H-P.t-P.b;
+    ctx.setLineDash([2,4]);ctx.strokeStyle='#1c2d47';ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y=P.t+(i/4)*ph;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(W-P.r,y);ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    pf.forEach((p,i)=>{
+      const x=P.l+((p[0]-xMin)/(xMax-xMin))*pw;
+      const y=P.t+ph-((p[1]-yMin)/(yMax-yMin))*ph;
+      ctx.fillStyle=COLORS[0];ctx.shadowColor=COLORS[0];ctx.shadowBlur=5;
+      ctx.beginPath();ctx.arc(x,y,4,0,2*Math.PI);ctx.fill();
+    });
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#3a5472';ctx.font='9px Fira Code,monospace';ctx.textAlign='center';
+    ctx.fillText(`Obj 1`,P.l+pw/2,H-3);
+    document.getElementById('opt-pareto-info').textContent=`${pf.length} Pareto-optimal solutions`;
+  }
+}
+function drawConvCanvas(data){
+  const can=document.getElementById('opt-conv-canvas');
+  const W=can.parentElement.clientWidth-12||460;can.width=W;
+  const H=360;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const hist=data?.convergence_history;
+  if(!hist?.length){
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code,monospace';ctx.textAlign='center';
+    ctx.fillText('No convergence data.',W/2,H/2);return;
+  }
+  const P={l:52,r:14,t:14,b:28};const pw=W-P.l-P.r,ph=H-P.t-P.b;
+  const yMin=Math.min(...hist),yMax=Math.max(...hist)||yMin+1;
+  const tx=i=>P.l+(i/(hist.length-1))*pw;
+  const ty=v=>P.t+ph-((v-yMin)/(yMax-yMin||1))*ph;
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#1c2d47';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=P.t+(i/4)*ph;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(W-P.r,y);ctx.stroke();
+    ctx.fillStyle='#3a5472';ctx.font='8px Fira Code,monospace';ctx.textAlign='right';
+    ctx.fillText((yMax-(i/4)*(yMax-yMin)).toFixed(3),P.l-3,y+3);
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle=COLORS[1];ctx.lineWidth=2;ctx.shadowColor=COLORS[1];ctx.shadowBlur=4;
+  ctx.beginPath();hist.forEach((v,i)=>i?ctx.lineTo(tx(i),ty(v)):ctx.moveTo(tx(i),ty(v)));
+  ctx.stroke();ctx.shadowBlur=0;
+}
+function renderOptResults(data){
+  const el=document.getElementById('opt-results-body');
+  if(!data?.optimal_x){el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">No solution.</div>';return;}
+  el.innerHTML=`
+    <div class="ctx-label">Best Objective Values</div>
+    <table class="res-table" style="margin-bottom:12px">
+      <thead><tr><th>Objective</th><th>Value</th></tr></thead>
+      <tbody>${data.optimal_objectives.map((v,i)=>`
+        <tr><td style="color:var(--teal)">${UI.optObjectives[i]?.type||'Obj '+i}</td>
+          <td style="color:var(--amber);font-family:var(--mono)">${v.toFixed(4)}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="ctx-label">Decision Variable Values</div>
+    <table class="res-table">
+      <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+      <tbody>${data.optimal_x.map((v,i)=>`
+        <tr><td style="color:var(--teal)">${UI.optDVars[i]?.name||'x'+i}</td>
+          <td style="color:var(--amber);font-family:var(--mono)">${typeof v==='number'?v.toFixed(3):v}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--text-dim)">
+      Method: ${data.method||'—'}  |  Evals: ${data.n_evaluations||'—'}  |  Time: ${data.wall_time_s?.toFixed(1)||'—'}s
+    </div>`;
+}
+
+/* ════════════════════════════════════════════════════════ MASS BALANCE */
+function showMassBalance(selNodes){
+  const panel=document.getElementById('mb-panel');
+  const body=document.getElementById('mb-body');
+  panel.style.display='';
+  panel.dataset.selIds=JSON.stringify(selNodes.map(n=>n.id));
+  const cstrs=PLANT.nodes.filter(n=>n.type==='cstr');
+  const opts=cstrs.map(n=>`<option value="${n.id}">${esc(n.label)}</option>`).join('');
+  body.innerHTML=`<div style="padding:4px 8px;border-bottom:1px solid var(--border);display:flex;gap:5px;align-items:center">
+    <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">SCOPE</span>
+    <select id="mb-scope" class="fi" style="flex:1;font-size:10px;padding:2px 4px" onchange="refreshMassBalance()">
+      <option value="__sel__">Selection (${selNodes.length})</option>
+      <option value="__all__">All Reactors</option>
+      ${opts}
+    </select>
+  </div><div id="mb-data"></div>`;
+  _renderMBData(selNodes);
+}
+function refreshMassBalance(){
+  const scope=document.getElementById('mb-scope')?.value;
+  const panel=document.getElementById('mb-panel');
+  const stored=JSON.parse(panel.dataset.selIds||'[]');
+  const cstrs=PLANT.nodes.filter(n=>n.type==='cstr');
+  let nodes;
+  if(scope==='__all__')nodes=cstrs;
+  else if(scope==='__sel__')nodes=PLANT.nodes.filter(n=>stored.includes(n.id));
+  else nodes=PLANT.nodes.filter(n=>n.id===scope);
+  _renderMBData(nodes);
+}
+function _renderMBData(nodes){
+  const el=document.getElementById('mb-data');if(!el)return;
+  const rr=PLANT.result?.reactor_results;
+  const mb=PLANT.result?.material_balance||{};
+  if(!rr&&!Object.keys(mb).length){
+    el.innerHTML='<div style="padding:6px 8px;font-family:var(--mono);font-size:11px;color:var(--text-dim)">Run simulation first.</div>';return;
+  }
+  const selLabels=new Set(nodes.map(n=>n.label));
+  const specIn={},specOut={};
+  nodes.forEach(node=>{
+    if(node.type!=='cstr')return;
+    const res=rr?.[node.label];if(!res)return;
+    PLANT.edges.forEach(e=>{
+      if(e.tgt===node.id){
+        const src=PLANT.nodes.find(n=>n.id===e.src);
+        if(!src||selLabels.has(src.label))return;
+        const flow=(e.config?.flow_rate_m3s||5e-4)*1000;
+        if(src.type==='source')Object.entries(src.config?.species||{}).forEach(([sp,c])=>{specIn[sp]=(specIn[sp]||0)+c*flow;});
+        else if(rr?.[src.label])Object.entries(rr[src.label].outlet_composition||{}).forEach(([sp,c])=>{specIn[sp]=(specIn[sp]||0)+c*flow;});
+      }
+      if(e.src===node.id){
+        const tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+        if(!tgt||selLabels.has(tgt.label)){
+          const flow=(e.config?.flow_rate_m3s||5e-4)*1000;
+          Object.entries(res.outlet_composition||{}).forEach(([sp,c])=>{specOut[sp]=(specOut[sp]||0)+c*flow;});
+        }
+      }
+    });
+    (node.config?.feeds||[]).forEach(f=>{
+      const flow=(f.flow_rate_m3s||5e-4)*1000;
+      Object.entries(f.species||{}).forEach(([sp,c])=>{specIn[sp]=(specIn[sp]||0)+c*flow;});
+    });
+  });
+  const allSp=[...new Set([...Object.keys(specIn),...Object.keys(specOut),...Object.keys(mb)])].sort();
+  if(!allSp.length){el.innerHTML='<div style="padding:6px 8px;font-family:var(--mono);font-size:11px;color:var(--text-dim)">No boundary flows found. Shift+drag to select nodes.</div>';return;}
+  let html='';
+  allSp.forEach((sp,si)=>{
+    const inV=specIn[sp]??((mb[sp]?.in_mol_s||0)*1000);
+    const outV=specOut[sp]??((mb[sp]?.out_mol_s||0)*1000);
+    const cl=inV>1e-9?Math.abs((inV-outV)/inV)*100:0;
+    const clCls=cl>15?'var(--red)':cl>5?'var(--amber)':'var(--green)';
+    html+=`<div style="padding:4px 8px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-family:var(--mono);font-size:11px;color:${COLORS[si%COLORS.length]}">${esc(sp)}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:${clCls}">${cl.toFixed(1)}% err</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;margin-top:2px;display:flex;gap:10px">
+        <span style="color:var(--teal)">In ${inV.toFixed(3)}</span>
+        <span style="color:var(--amber)">Out ${outV.toFixed(3)}</span>
+        <span style="color:var(--text-dim)">mmol/s</span>
+      </div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+/* ════════════════════════════════════════════════════ SPECIES PROPERTIES */
+let _speciesProps={};
+function toggleSpProps(){
+  const b=document.getElementById('sp-props-body');
+  b.style.display=b.style.display==='none'?'block':'none';
+  if(b.style.display==='block')renderSpPropsList();
+}
+function renderSpPropsList(){
+  const el=document.getElementById('sp-props-list');
+  if(!Object.keys(_speciesProps).length){el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:3px">No species defined.</div>';return;}
+  el.innerHTML=Object.entries(_speciesProps).map(([sp,p])=>
+    `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;font-family:var(--mono);font-size:10px">
+      <span style="color:var(--amber);flex:1">${esc(sp)}</span>
+      <span style="color:var(--teal)">${p.density_kg_m3||'?'} kg/m³</span>
+      <span style="color:var(--text-dim)">${p.molar_mass_g_mol||'?'} g/mol</span>
+      <button class="xbtn" onclick="deleteSpProp('${esc(sp)}')">x</button>
+    </div>`).join('');
+}
+async function addSpeciesProp(){
+  const name=document.getElementById('sp-prop-name')?.value.trim();
+  const rho=parseFloat(document.getElementById('sp-prop-rho')?.value)||1000;
+  const mw=parseFloat(document.getElementById('sp-prop-mw')?.value)||18;
+  if(!name){toast('Enter species name.');return;}
+  _speciesProps[name]={density_kg_m3:rho,molar_mass_g_mol:mw};
+  renderSpPropsList();
+  // Sync to backend
+  const r=await api('POST','/api/species_properties',{[name]:{density_kg_m3:rho,molar_mass_g_mol:mw}});
+  if(r.status==='ok')toast(`${name} properties saved (ρ=${rho} kg/m³, MW=${mw} g/mol).`);
+  document.getElementById('sp-prop-name').value='';
+}
+async function deleteSpProp(name){
+  delete _speciesProps[name];renderSpPropsList();
+}
+async function loadSpProps(){
+  const r=await api('GET','/api/species_properties');
+  if(r.status==='ok'){_speciesProps=r.data||{};renderSpPropsList();}
+}
+
+/* ════════════════════════════════════════════════ FIX PROPOSAL POPUP */
+async function openFixProposal(reactorName){
+  openModal('fix-modal');
+  document.getElementById('fix-modal-sub').textContent=reactorName?`Reactor: ${reactorName}`:'All error reactors';
+  document.getElementById('fix-proposals-body').innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">Analyzing...</div>';
+  const r=await api('POST','/api/propose_fix',{reactor_name:reactorName||''});
+  if(r.status!=='ok'){
+    document.getElementById('fix-proposals-body').innerHTML=`<div style="color:var(--red);font-family:var(--mono);font-size:11px">${esc(r.message||'Failed.')}</div>`;
+    return;
+  }
+  const {proposals,reactor_errors}=r.data;
+  if(!proposals.length){
+    document.getElementById('fix-proposals-body').innerHTML='<div style="color:var(--green);font-family:var(--mono);font-size:11px">No instability detected.</div>';
+    return;
+  }
+  let html='';
+  Object.entries(reactor_errors||{}).forEach(([rn,msg])=>{
+    html+=`<div style="background:rgba(232,64,64,.1);border:1px solid var(--red);border-radius:3px;padding:6px 8px;margin-bottom:8px;font-family:var(--mono);font-size:10px;color:var(--red)">[${esc(rn)}] ${esc(msg)}</div>`;
+  });
+  proposals.forEach(p=>{
+    const priCls=p.priority===0?'priority-0':p.priority===1?'priority-1':'';
+    const priLabel=p.priority===0?'INFEASIBLE':p.priority===1?'RECOMMENDED':'Option '+p.priority;
+    const priColor=p.priority===0?'var(--red)':p.priority===1?'var(--teal)':'var(--text-dim)';
+    html+=`<div class="fix-proposal ${priCls}">
+      <div class="fix-priority" style="color:${priColor}">${priLabel}</div>
+      <div class="fix-desc">${esc(p.description)}</div>
+      ${p.feasible&&p.proposed_value!=null?`<div style="display:flex;align-items:center;gap:8px">
+        <span class="fix-value">${p.field}: ${p.proposed_value}</span>
+        <button class="btn sm teal" onclick="applyFix(${JSON.stringify(p)})">Apply</button>
+      </div>`:''}
+    </div>`;
+  });
+  document.getElementById('fix-proposals-body').innerHTML=html;
+}
+
+async function applyFix(proposal){
+  const rname=proposal.reactor;
+  const node=PLANT.nodes.find(n=>n.label===rname);
+  if(!node){toast('Reactor not found in plant.');return;}
+
+  if(proposal.field==='volume_L'){
+    node.config.volume_L=proposal.proposed_value;
+    toast(`Volume → ${proposal.proposed_value} L for ${rname}. Re-simulating...`);
+
+  }else if(proposal.field==='T_kelvin'){
+    if(!node.config.temperature)node.config.temperature={mode:'isothermal'};
+    node.config.temperature.T_kelvin=proposal.proposed_value;
+    toast(`Temperature → ${proposal.proposed_value} K for ${rname}. Re-simulating...`);
+
+  }else if(proposal.field==='flow_rate_Ls'){
+    // Throttle ALL outlet pipes from this reactor
+    const outlets=PLANT.edges.filter(e=>e.src===node.id);
+    const q_each=proposal.proposed_value/1000/Math.max(outlets.length,1);
+    outlets.forEach(e=>{if(!e.config)e.config={};e.config.flow_rate_m3s=q_each;});
+    toast(`Outlet flows → ${proposal.proposed_value} L/s total for ${rname}. Re-simulating...`);
+
+  }else if(proposal.field==='feed_flow_Ls'){
+    // Boost feed streams for this reactor
+    const feeds=node.config.feeds||[];
+    if(feeds.length){
+      const q_each=(proposal.proposed_value/1000)/feeds.length;
+      feeds.forEach(f=>{f.flow_rate_m3s=q_each;});
+      toast(`Feed flows increased for ${rname}. Re-simulating...`);
+    }else{
+      // Boost inlet pipe flows
+      const inlets=PLANT.edges.filter(e=>e.tgt===node.id);
+      const q_each=(proposal.proposed_value/1000)/Math.max(inlets.length,1);
+      inlets.forEach(e=>{if(!e.config)e.config={};e.config.flow_rate_m3s=q_each;});
+      toast(`Inlet pipe flows increased for ${rname}. Re-simulating...`);
+    }
+  }
+
+  closeModal('fix-modal');
+  renderWorkspace();
+  // Auto re-simulate so the fix takes effect immediately
+  await runSimulation();
+}
+
+/* ═══════════════════════════════════════════ CONNECTIONS TAB IN INSPECTOR */
+function renderRConnections(nodeId){
+  const node=PLANT.nodes.find(n=>n.id===nodeId);
+  if(!node)return;
+  const inletsEl=document.getElementById('r-inlets');
+  const outletsEl=document.getElementById('r-outlets');
+  const errorEl=document.getElementById('r-error-state');
+  if(!inletsEl)return;
+  // Inlets: edges pointing to this node
+  const inlets=PLANT.edges.filter(e=>e.tgt===node.id);
+  const outlets=PLANT.edges.filter(e=>e.src===node.id);
+  const fmt=edges=>edges.length?edges.map(e=>{
+    const partner=PLANT.nodes.find(n=>n.id===(e.src===node.id?e.tgt:e.src));
+    const partLabel=partner?.label||'?';
+    const color=nodeColor(partner?.type||'cstr');
+    const flow=((e.config?.flow_rate_m3s||5e-4)*1000).toFixed(3);
+    const rr=PLANT.result?.reactor_results?.[partLabel];
+    const oc=rr?.outlet_composition;
+    const spTags=oc?Object.entries(oc).map(([sp,v])=>`<span style="color:var(--teal);font-size:9px">${esc(sp)}:${v.toFixed(3)}</span>`).join(' '):'';
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:5px 8px;margin-bottom:3px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--text-bright)">${esc(partLabel)}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--amber);margin-left:auto">${flow} L/s</span>
+      </div>
+      ${spTags?`<div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap">${spTags}</div>`:''}
+    </div>`;
+  }).join('')
+  :'<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px">None.</div>';
+  inletsEl.innerHTML=fmt(inlets);
+  outletsEl.innerHTML=fmt(outlets);
+  // Error state
+  const isError=PLANT.result?.run_dry_reactors?.includes(node.label);
+  const errMsg=PLANT.result?.stability_errors?.[node.label]||'';
+  if(isError){
+    errorEl.style.color='var(--red)';
+    errorEl.innerHTML=`<div style="margin-bottom:5px">${esc(errMsg)}</div>
+      <button class="btn sm danger" onclick="openFixProposal('${esc(node.label)}')">Fix Proposal</button>`;
+  } else {
+    errorEl.style.color='var(--green)';
+    errorEl.textContent='No errors.';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════ SAVE / UPLOAD */
+function saveProject(){
+  const proj={plant:PLANT,params:{t_end:document.getElementById('p-tend').value,n_segs:document.getElementById('p-segs').value,name:document.getElementById('p-name').value}};
+  const blob=new Blob([JSON.stringify(proj,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=(document.getElementById('p-name').value||'networklite')+'.json';
+  a.click();toast('Project saved.');
+}
+
+function uploadProject(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const proj=JSON.parse(ev.target.result);
+      if(proj.plant){PLANT=proj.plant;}
+      if(proj.params){
+        if(proj.params.t_end)document.getElementById('p-tend').value=proj.params.t_end;
+        if(proj.params.n_segs)document.getElementById('p-segs').value=proj.params.n_segs;
+        if(proj.params.name)document.getElementById('p-name').value=proj.params.name;
+      }
+      renderWorkspace();renderContextPanel();toast('Project loaded.');
+    }catch(err){toast('Invalid JSON file.');}
+  };
+  r.readAsText(f);
+}
+
+/* ══════════════════════════════════════════════════════════════════ MODALS */
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  // v2: notify backend to clear cached plots for this window
+  if(id==='pipe-modal'&&UI.inspectorEdgeId){
+    const edge=PLANT.edges.find(e=>e.id===UI.inspectorEdgeId);
+    const src=PLANT.nodes.find(n=>n.id===edge?.src);
+    const tgt=PLANT.nodes.find(n=>n.id===edge?.tgt);
+    const windowId=encodeURIComponent(`${src?.label}→${tgt?.label}`);
+    fetch(`/api/plots/window/${windowId}`,{method:'DELETE'}).catch(()=>{});
+  }
+  if(id==='reactor-modal'&&UI.inspectorNodeId){
+    const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
+    if(node){
+      const windowId=encodeURIComponent(node.label);
+      fetch(`/api/plots/window/${windowId}`,{method:'DELETE'}).catch(()=>{});
+    }
+    // Remove the concentration table widget so it doesn't show stale data next open
+    const tbl=document.getElementById('conc-num-table');if(tbl)tbl.remove();
+  }
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');});
+});
+
+// Tab switching
+function switchTab(prefix,name){
+  document.querySelectorAll(`[id^="${prefix}-tab-"]`).forEach(t=>{
+    t.classList.toggle('active',t.id===`${prefix}-tab-${name}`);
+  });
+  const tabs=document.querySelectorAll('.tabs .tab');
+  const tabNames=['info','feeds','species','reactions','outlet','pareto','convergence','results'];
+  tabs.forEach(t=>{
+    const n=t.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1];
+    if(n)t.classList.toggle('active',n===name);
+  });
+}
+
+function toggleAddForm(id){
+  const el=document.getElementById(id);
+  if(el){el.classList.toggle('open');if(el.classList.contains('open')){const i=el.querySelector('input');if(i)i.focus();}}
+}
+
+/* ══════════════════════════════════════════════════════════════════ HELP */
+async function loadHelp(){
+  const r=await api('GET','/api/readme');
+  const el=document.getElementById('help-body');
+  if(r.status!=='ok'){el.innerHTML='<p style="color:var(--red)">Could not load documentation.</p>';return;}
+  // Basic markdown to HTML
+  let md=r.data?.content||r.data||'';
+  md=md.replace(/```[\w]*\n([\s\S]*?)```/g,'<pre><code>$1</code></pre>');
+  md=md.replace(/`([^`]+)`/g,'<code>$1</code>');
+  md=md.replace(/^#### (.+)$/gm,'<h3>$1</h3>');
+  md=md.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  md=md.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  md=md.replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  md=md.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  md=md.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  md=md.replace(/^---$/gm,'<hr>');
+  md=md.replace(/^\| .+$/gm,l=>`<tr>${l.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('')}</tr>`);
+  md=md.replace(/(<tr>.*<\/tr>\s*)+/g,m=>`<table>${m}</table>`);
+  md=md.replace(/^- (.+)$/gm,'<li>$1</li>');
+  md=md.replace(/(<li>.*<\/li>\s*)+/g,m=>`<ul>${m}</ul>`);
+  md=md.replace(/\n\n/g,'</p><p>');
+  md='<p>'+md+'</p>';
+  el.innerHTML=md;
+}
+
+document.getElementById('help-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('help-modal'))return;
+},{once:false});
+document.querySelector('[onclick*="help-modal"]')?.addEventListener('click',loadHelp,{once:false});
+
+// Also load help when opened
+const origOpenModal=openModal;
+window.openModal=function(id){origOpenModal(id);if(id==='help-modal')loadHelp();};
+
+/* ════════════════════════════════════════════════════════════════ OPTIMIZER BTN */
+// Add optimizer button to header action area
+document.querySelector('.hdr').insertAdjacentHTML('beforeend',
+  `<button class="btn sm" onclick="openOptimizer()" style="order:-1">Optimizer</button>`);
+
+/* ════════════════════════════════════════════════════════════ KEYBOARD */
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+    if(UI.drawingEdge){UI.drawingEdge=null;drawingLine.style.display='none';}
+    select(null,null);
+  }
+  if(e.key==='Delete'&&UI.selected)deleteSelected();
+});
+
+/* ════════════════════════════════════════════════════════ INIT */
+(async()=>{
+  loadSpProps().catch(()=>{});
+  const r=await api('GET','/api/status');
+  if(r.status==='ok'){
+    const d=r.data;
+    setStatus('ok',`v${d.version||'2.0'} — ChemSim:${d.chemsim?'ok':'missing'} TS:${d.transportsim?'ok':'missing'}`);
+  }else{
+    setStatus('err','API offline — is Flask running?');
+  }
+  renderWorkspace();
+})();
+</script>
+</body>
+</html>
