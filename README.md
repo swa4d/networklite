@@ -31,7 +31,10 @@ A chemical plant network simulator combining **ChemSim** (reaction kinetics) and
 
 ```bash
 # Install dependencies
-pip install flask flask-cors numpy scipy matplotlib pybind11
+pip install -r requirements.txt
+
+# Install chemsim
+pip install git+https://github.com/swa4d/chemsim
 
 # Build C++ extension (optional but recommended — Python fallback available)
 cd transportsim/core
