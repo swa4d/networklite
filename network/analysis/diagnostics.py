@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import sys as _sys
 for _p in ["/mnt/project", "/home/claude/networklite"]:
     if _p not in _sys.path: _sys.path.insert(0, _p)
@@ -85,19 +86,53 @@ def plot_reactor_trajectories(
         if not hasattr(rr, 'temperature_profile'):
             continue
 
-        n_sp = len(rr.species_names)
+        is_stochastic = getattr(rr, 'simulation_mode', 'deterministic') == 'stochastic'
+        sd            = getattr(rr, 'stochastic_data', None) if is_stochastic else None
+
         fig, axes = _styled_fig(1, 2, figsize=(12, 4))
         ax_conc, ax_T = axes
 
-        # Concentration trajectories
-        for i, sp in enumerate(rr.species_names):
-            col = PALETTE[i % len(PALETTE)]
-            ax_conc.plot(rr.time, rr.concentrations[:, i],
-                         color=col, lw=1.8, label=sp)
+        if is_stochastic and sd and sd.get('mean'):
+            # ── Stochastic: mean ± std with p5/p95 envelope ────────────────
+            t_arr   = np.asarray(sd['time'])
+            mean_a  = np.asarray(sd['mean'])   # (T, M)
+            std_a   = np.asarray(sd['std'])
+            p5_a    = np.asarray(sd['p5'])
+            p95_a   = np.asarray(sd['p95'])
+            sp_names = sd.get('species_names', rr.species_names)
+            omega    = sd.get('omega', '?')
+            n_traj   = sd.get('n_trajectories', '?')
+
+            for i, sp in enumerate(sp_names):
+                col = PALETTE[i % len(PALETTE)]
+                ax_conc.fill_between(t_arr, p5_a[:, i], p95_a[:, i],
+                                     color=col, alpha=0.12)
+                ax_conc.fill_between(t_arr, mean_a[:, i] - std_a[:, i],
+                                     mean_a[:, i] + std_a[:, i],
+                                     color=col, alpha=0.22)
+                ax_conc.plot(t_arr, mean_a[:, i],
+                             color=col, lw=2, label=sp)
+                # Faint sample trajectories
+                for traj in (sd.get('sample_trajectories') or [])[:3]:
+                    t_arr2 = np.asarray(traj)
+                    ax_conc.plot(t_arr, t_arr2[:, i] if t_arr2.ndim == 2 else t_arr2,
+                                 color=col, lw=0.6, alpha=0.25)
+
+            ax_conc.set_title(
+                f"{rname} — Stochastic SSA (Ω={omega}, N={n_traj} traj)\n"
+                "Mean ± σ band;  p5–p95 envelope",
+                color="#EEEEEE", fontsize=9
+            )
+        else:
+            # ── Deterministic: standard trajectory ────────────────────────
+            for i, sp in enumerate(rr.species_names):
+                col = PALETTE[i % len(PALETTE)]
+                ax_conc.plot(rr.time, rr.concentrations[:, i],
+                             color=col, lw=1.8, label=sp)
+            ax_conc.set_title(f"{rname} — Species Concentrations")
 
         ax_conc.set_xlabel("Time (s)")
         ax_conc.set_ylabel("Concentration (M)")
-        ax_conc.set_title(f"{rname} — Species Concentrations")
         ax_conc.legend(fontsize=8, framealpha=0.3,
                        facecolor="#1A1D27", labelcolor="#CCCCCC")
         ax_conc.grid(alpha=0.15)
@@ -111,7 +146,7 @@ def plot_reactor_trajectories(
         ax_T.grid(alpha=0.15)
 
         fig.tight_layout()
-        plots[rname] = _fig_to_b64(fig)
+        plots[f"trajectory_{rname}"] = _fig_to_b64(fig)
 
     return plots
 
@@ -495,7 +530,8 @@ def generate_all_plots(
 
     try:
         traj = plot_reactor_trajectories(result)
-        plots.update({f"trajectory_{k}": v for k, v in traj.items()})
+        # plot_reactor_trajectories already uses "trajectory_{rname}" keys
+        plots.update(traj)
     except Exception:
         pass
 

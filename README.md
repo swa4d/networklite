@@ -25,28 +25,13 @@ A chemical plant network simulator combining **ChemSim** (reaction kinetics) and
 - **Graph cleanup** — closing an inspector window sends `DELETE /api/plots/window/<id>` to the server, clearing cached plot data so reopening generates a fresh plot rather than serving a stale one.
 - **Pressure sweep / tools for sources/sinks** — pressure tools now work on all node types.
 
-### Open Issues
-- **ChemSim refactoring** - removing the chemsim source repository has caused all reaction simulations to return nothing.
-- **New species** - new species are not featured in reactors, currently use is constrained to A,B.
-- **Species physical specifications** - species details like density and molar mass does not update equations internally.
-- **Sink demand and behavior** - sink demand does not impact graph validation, in terms of pressure and concentrations. Additionally, poor sink requirement isn't caught or included in any calculations.
-- **Optimization** - disabled until constraints for graph validated.
-- **Reaction coefficients** - coefficients for reactions are ignored.
-- **Reactor overflow is non-explicit** - when more volume is supplied to a reactor than it outputs, it should have a steady state violation and an explicit overflow marker with volume being lost (and time marking).
-- **Example generation** - prompting an example results in infinite loading.
-- **Auto-balance is poorly constrained** - autobalance does not include concentration requirements, or prefer steady state.
-- **Simulation overflow** - too many segments may cause simulation to fail.
-
 ---
 
 ## Quick Start
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
-
-# Install chemsim
-pip install git+https://github.com/swa4d/chemsim
+pip install flask flask-cors numpy scipy matplotlib pybind11
 
 # Build C++ extension (optional but recommended — Python fallback available)
 cd transportsim/core

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import sys as _sys
 for _p in ["/mnt/project", "/home/claude/networklite"]:
     if _p not in _sys.path: _sys.path.insert(0, _p)
@@ -100,18 +101,34 @@ class Objective:
 # ── Pre-built objective functions ─────────────────────────────────────────────
 
 def yield_objective(reactor_name: str, species: str, direction="maximize") -> Objective:
-    """Maximize/minimize molar fraction of `species` in reactor outlet."""
+    """
+    Maximize/minimize the **outlet molar fraction** of `species`.
+
+    This is defined as:
+        f = C_species_out / Σ_i C_i_out
+
+    This is a concentration-fraction proxy, NOT chemical yield
+    (moles_product / theoretical_max_from_limiting_reagent).
+    For chemical yield, use :func:`conversion_objective` on the reactant.
+    """
     def fn(result):
         rr = result.reactor_results.get(reactor_name)
         if rr is None or not rr.outlet_composition:
             return 0.0
         total = sum(rr.outlet_composition.values()) or 1.0
         return rr.outlet_composition.get(species, 0.0) / total
-    return Objective(name=f"yield_{species}@{reactor_name}", direction=direction, fn=fn)
+    return Objective(name=f"molar_frac_{species}@{reactor_name}", direction=direction, fn=fn)
+
+# Alias kept for backward compatibility
+molar_fraction_objective = yield_objective
 
 
 def conversion_objective(reactor_name: str, species: str, direction="maximize") -> Objective:
-    """Maximize/minimize conversion of `species` in reactor."""
+    """
+    Maximize/minimize conversion of `species` in reactor.
+
+    Conversion X_i = max(0, (C_in_i - C_out_i) / C_in_i).
+    """
     def fn(result):
         rr = result.reactor_results.get(reactor_name)
         if rr is None:
@@ -121,7 +138,7 @@ def conversion_objective(reactor_name: str, species: str, direction="maximize") 
 
 
 def residence_time_objective(reactor_name: str, direction="minimize") -> Objective:
-    """Minimize/maximize residence time (proxy for reactor cost)."""
+    """Minimize/maximize residence time τ = V/Q [s] (proxy for reactor capital cost)."""
     def fn(result):
         rr = result.reactor_results.get(reactor_name)
         if rr is None:
@@ -131,12 +148,18 @@ def residence_time_objective(reactor_name: str, direction="minimize") -> Objecti
 
 
 def total_compressor_power_objective(direction="minimize") -> Objective:
-    """Minimize total compressor power across all pipelines."""
+    """
+    Minimize total pump/compressor shaft power [kW] across all pipelines.
+
+    Uses ConnectionDiagnostic.compressor_kW; gracefully returns 0 for
+    connections where the attribute is absent (e.g. gravity-driven flows).
+    """
     def fn(result):
         total_kW = sum(
-            d.compressor_kW for d in result.connection_diags.values()
+            getattr(d, "compressor_kW", 0.0)
+            for d in result.connection_diags.values()
         )
-        return total_kW
+        return max(total_kW, 0.0)
     return Objective(name="compressor_power_kW", direction=direction, fn=fn)
 
 

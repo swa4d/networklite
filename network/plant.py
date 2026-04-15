@@ -90,6 +90,7 @@ class NetworkSimulationResult:
     simulation_order   : List[str]
     total_pump_kW      : float = 0.0
     run_dry_reactors   : List[str] = field(default_factory=list)
+    overflow_reactors  : List[str] = field(default_factory=list)   # v2.1: inlet > outlet
     stability_errors   : Dict[str, str] = field(default_factory=dict)
     source_pressures   : Dict[str, float] = field(default_factory=dict)
 
@@ -106,6 +107,7 @@ class NetworkSimulationResult:
             "simulation_order" : self.simulation_order,
             "total_pump_kW"    : round(self.total_pump_kW, 4),
             "run_dry_reactors" : self.run_dry_reactors,
+            "overflow_reactors": self.overflow_reactors,
             "stability_errors" : self.stability_errors,
             "source_pressures" : {k: round(v / 1000, 3) for k, v in self.source_pressures.items()},
             "pump_breakdown"   : pb.get("pump_states", {}),
@@ -279,14 +281,16 @@ class PlantNetwork:
         last = upstream_names[-1]
         node = self._nodes[last]
 
+        is_source_sink = _HAS_SS and isinstance(node, SourceSink)
+
         # SourceSinks route their composition forward directly
-        if _HAS_SS and isinstance(node, SourceSink):
-            outlet     = node.outlet_composition
-            Q_out      = node.flow_rate_m3s
-            sp_comp    = dict(outlet)
+        if is_source_sink:
+            outlet  = node.outlet_composition
+            Q_out   = node.flow_rate_m3s
+            sp_comp = dict(outlet)
         elif hasattr(node, "result") and node.result is not None:
-            outlet = node.result.outlet_composition
-            Q_out  = getattr(node, "total_flow_m3s", 0.0)
+            outlet  = node.result.outlet_composition
+            Q_out   = getattr(node, "total_flow_m3s", 0.0)
             sp_comp = dict(outlet)
         else:
             return
@@ -300,10 +304,22 @@ class PlantNetwork:
                 continue
             # Only inject into CSTR nodes (SourceSinks don't need feeds)
             if _HAS_CSTR and isinstance(target_node, CSTR):
-                target_node._feeds = [
-                    f for f in target_node._feeds
-                    if not f.name.startswith(f"_from_{last}")
-                ]
+                if is_source_sink:
+                    # The SourceSink IS the physical feed for this CSTR.
+                    # Remove ALL existing explicit (non-auto) feeds from this
+                    # source direction to prevent double-counting: the pipe from
+                    # the Source node replaces any manually-added direct feeds.
+                    target_node._feeds = [
+                        f for f in target_node._feeds
+                        if f.name.startswith("_from_")
+                    ]
+                else:
+                    # For CSTR→CSTR routing, only remove the previous auto-feed
+                    target_node._feeds = [
+                        f for f in target_node._feeds
+                        if not f.name.startswith(f"_from_{last}")
+                    ]
+
                 Q_pipe = conn.pipeline.flow_rate_m3s
                 if sp_comp and Q_pipe > 0:
                     target_node.add_feed(FeedStream(
@@ -392,9 +408,29 @@ class PlantNetwork:
 
         for rname in order:
             node = self._nodes[rname]
-            # SourceSinks never run dry
-            if _HAS_SS and isinstance(node, SourceSink):
+
+            # ── Sink demand validation ─────────────────────────────────────
+            if _HAS_SS and isinstance(node, SourceSink) and node.node_type == "sink":
+                rr = reactor_results.get(rname)
+                # Check that each upstream connection is actually delivering flow
+                inlet_conns = [c for c in self._connections.values() if c.target == rname]
+                total_inlet = sum(c.pipeline.flow_rate_m3s for c in inlet_conns)
+                if total_inlet < 1e-9 and inlet_conns:
+                    msg = f"Sink '{rname}' has no flow — upstream reactors may be empty."
+                    new_issues.append(f"[{rname}] {msg}")
+                # Check min-concentration specs on sink
+                specs = getattr(node, "product_specs", {})
+                if specs and rr is not None:
+                    for sp, min_c in specs.items():
+                        actual = rr.outlet_composition.get(sp, 0.0)
+                        if actual < min_c:
+                            msg = (f"Sink '{rname}': {sp} = {actual:.4f} M < "
+                                   f"required {min_c:.4f} M (deficit {(min_c-actual):.4f} M).")
+                            new_issues.append(f"[{rname}] {msg}")
                 continue
+
+            if _HAS_SS and isinstance(node, SourceSink):
+                continue  # source — never runs dry
 
             rr = reactor_results.get(rname)
             if rr is None:
@@ -405,11 +441,15 @@ class PlantNetwork:
                 for c in self._connections.values()
                 if c.source == rname
             )
+
             if _HAS_CSTR and isinstance(node, CSTR):
-                inlet_Q = node.total_flow_m3s
+                inlet_Q = node.total_flow_m3s   # now correct — no double-counting
+                vol_L   = node.volume_L
             else:
                 inlet_Q = getattr(node, "total_flow_m3s", 0.0)
+                vol_L   = getattr(node, "volume_L", 0.0)
 
+            # ── Run-dry: demand exceeds supply ─────────────────────────────
             if downstream_Q > inlet_Q * 1.15 and inlet_Q > 1e-9:
                 msg = (
                     f"Run-dry: downstream demand {downstream_Q*1000:.3f} L/s "
@@ -420,6 +460,21 @@ class PlantNetwork:
                 errors[rname] = msg
                 new_issues.append(f"[{rname}] {msg}")
 
+            # ── Overflow: more fed in than piped out ───────────────────────
+            elif inlet_Q > downstream_Q * 1.10 and downstream_Q > 1e-9 and vol_L < float("inf"):
+                excess_Ls = (inlet_Q - downstream_Q) * 1000.0
+                # Time until volume overflows at this accumulation rate
+                # (vol_L already full; marginal overflow rate = excess_Ls L/s)
+                fill_time_s = vol_L / max(excess_Ls, 1e-9)
+                msg = (
+                    f"Overflow: inlet {inlet_Q*1000:.3f} L/s > outlet {downstream_Q*1000:.3f} L/s. "
+                    f"Excess {excess_Ls:.3f} L/s accumulating — overflow in ~{fill_time_s:.0f} s."
+                )
+                errors[rname] = msg
+                new_issues.append(f"[{rname}] OVERFLOW: {msg}")
+                # Overflow is a warning, not run-dry — don't add to run_dry list
+                # but flag it so the UI can show the overflow marker
+
             if not getattr(rr, "converged", True):
                 if rname not in errors:
                     run_dry.append(rname)
@@ -428,13 +483,16 @@ class PlantNetwork:
 
         return run_dry, errors, new_issues
 
+
     # ── Main simulation ───────────────────────────────────────────────────────
 
     def simulate(
         self,
-        t_end        : float = 500.0,
-        n_segments   : int   = 20,
-        solver_params: Optional[dict] = None,
+        t_end            : float = 500.0,
+        n_segments       : int   = 20,
+        solver_params    : Optional[dict] = None,
+        mode             : str   = "deterministic",
+        stochastic_params: Optional[dict] = None,
     ) -> NetworkSimulationResult:
         global_issues: List[str] = []
         order = self._topological_order()
@@ -452,9 +510,14 @@ class PlantNetwork:
             if i > 0:
                 self._route_outlet_to_feeds(order[:i])
             try:
+                sim_kwargs = {}
+                if _HAS_CSTR and isinstance(node, CSTR):
+                    sim_kwargs["solver_params"]     = solver_params
+                    sim_kwargs["mode"]              = mode
+                    sim_kwargs["stochastic_params"] = stochastic_params
                 result = node.simulate(
                     t_end=t_end, n_segments=n_segments,
-                    **({"solver_params": solver_params} if _HAS_CSTR and isinstance(node, CSTR) else {})
+                    **sim_kwargs,
                 )
                 reactor_results[rname] = result
                 for iss in getattr(result, "issues", []):
@@ -473,11 +536,17 @@ class PlantNetwork:
                     "(>10% deviation)."
                 )
 
-        # 5. Stability / run-dry
+        # 5. Stability / run-dry / overflow
         run_dry, stability_errors, stab_issues = self._check_stability(
             order, reactor_results, material_balance
         )
         global_issues.extend(stab_issues)
+
+        # Separate overflow reactors from run-dry (overflow not in run_dry list)
+        overflow_reactors = [
+            rname for rname, msg in stability_errors.items()
+            if "Overflow" in msg and rname not in run_dry
+        ]
 
         # 6. Pump energy from pressure balance
         total_pump_kW = 0.0
@@ -510,6 +579,7 @@ class PlantNetwork:
             simulation_order   = order,
             total_pump_kW      = round(total_pump_kW, 4),
             run_dry_reactors   = run_dry,
+            overflow_reactors  = overflow_reactors,
             stability_errors   = stability_errors,
             source_pressures   = source_pressures,
         )

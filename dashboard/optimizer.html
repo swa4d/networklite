@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NetworkLite — Optimizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Barlow:wght@300;400;500;600&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07080e;--surface:#0d1220;--surface2:#121a2a;--surface3:#17213a;
+  --border:#1c2d47;--border2:#28405e;
+  --amber:#f0a030;--teal:#18d8b0;--blue:#4a90f5;--pink:#d050c8;
+  --red:#e84040;--green:#40c878;
+  --text:#8aaec8;--text-bright:#cce0f8;--text-dim:#3a5472;
+  --mono:'Fira Code',monospace;--sans:'Barlow',sans-serif;--display:'Orbitron',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.hdr{height:46px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px}
+.logo{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:4px;color:var(--amber)}
+.logo em{color:var(--teal);font-style:normal}
+.hdr-sep{flex:1}
+
+.btn{height:27px;padding:0 11px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:var(--sans);font-size:11px;cursor:pointer;border-radius:3px;transition:all .13s;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:var(--border);color:var(--text-bright)}
+.btn.pri{background:var(--amber);border-color:var(--amber);color:#000;font-weight:600}
+.btn.pri:hover{background:#f8b848}
+.btn.teal{background:transparent;border-color:var(--teal);color:var(--teal)}
+.btn:disabled{opacity:.35;pointer-events:none}
+
+.main{display:flex;height:calc(100vh - 46px)}
+.left{width:320px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+.sec-hdr{height:30px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:8px;flex-shrink:0}
+.sec-title{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);flex:1}
+.sec-body{padding:8px;display:flex;flex-direction:column;gap:5px}
+
+.fi{background:var(--surface);border:1px solid var(--border2);border-radius:3px;color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:3px 7px;outline:none;width:100%}
+.fi:focus{border-color:var(--amber)}
+.fr{display:flex;align-items:center;gap:6px}
+.fl{font-size:10px;color:var(--text-dim);width:80px;flex-shrink:0;font-family:var(--mono)}
+
+.obj-row{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:3px}
+.obj-label{font-family:var(--mono);font-size:11px;color:var(--text-bright);flex:1}
+.xbtn{width:16px;height:16px;border:none;background:transparent;color:var(--text-dim);cursor:pointer;border-radius:2px;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+.xbtn:hover{color:var(--red);background:rgba(232,64,64,.12)}
+
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{height:30px;padding:0 14px;border:none;background:transparent;color:var(--text-dim);font-family:var(--mono);font-size:10px;cursor:pointer;border-bottom:2px solid transparent;transition:all .13s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.tab-body{flex:1;overflow-y:auto;display:none}
+.tab-body.active{display:block}
+
+.res-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.res-table th{text-align:left;padding:4px 8px;background:var(--surface);border-bottom:1px solid var(--border);color:var(--text-dim);font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.res-table td{padding:4px 8px;border-bottom:1px solid var(--border)}
+
+.status-bar{height:24px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;font-family:var(--mono);font-size:10px;color:var(--text-dim)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim)}
+.dot.ok{background:var(--green)}
+.dot.run{background:var(--amber);animation:pulse 1s ease infinite}
+.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+canvas{width:100%;display:block;background:#07080e;border-radius:3px}
+
+.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.7}
+.info-box strong{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">NETWORK<em>LITE</em> &mdash; OPTIMIZER</div>
+  <div class="hdr-sep"></div>
+  <div class="dot" id="sdot"></div>
+  <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="stxt">Ready</span>
+  <button class="btn pri" id="run-btn" onclick="runOptimizer()">Run NSGA-II</button>
+  <button class="btn" onclick="window.close()">Close</button>
+</div>
+
+<div class="main">
+  <!-- LEFT: config -->
+  <div class="left">
+
+    <div class="sec-hdr"><span class="sec-title">Decision Variables</span>
+      <button class="btn" style="height:22px;padding:0 8px;font-size:10px" onclick="addDVar()">+ Add</button>
+    </div>
+    <div class="sec-body" id="dv-list" style="flex:0">
+      <div class="info-box">No decision variables. Click <strong>+ Add</strong>.</div>
+    </div>
+
+    <div class="sec-hdr"><span class="sec-title">Objectives</span>
+      <button class="btn" style="height:22px;padding:0 8px;font-size:10px" onclick="addObjective()">+ Add</button>
+    </div>
+    <div class="sec-body" id="obj-list" style="flex:0">
+      <div class="info-box">No objectives. Click <strong>+ Add</strong>.</div>
+    </div>
+
+    <div class="sec-hdr"><span class="sec-title">Settings</span></div>
+    <div class="sec-body">
+      <div class="fr"><span class="fl">Method</span>
+        <select class="fi" id="opt-method">
+          <option value="nsga2">NSGA-II (Pareto)</option>
+          <option value="weighted">Weighted Sum</option>
+          <option value="slsqp">SLSQP (Single)</option>
+        </select>
+      </div>
+      <div class="fr"><span class="fl">Pop size</span><input class="fi" id="opt-pop" type="number" value="20" min="4"></div>
+      <div class="fr"><span class="fl">Generations</span><input class="fi" id="opt-gen" type="number" value="10" min="1"></div>
+      <div class="fr"><span class="fl">t sim (s)</span><input class="fi" id="opt-tend" type="number" value="200" min="10"></div>
+      <div class="fr"><span class="fl">Segments</span><input class="fi" id="opt-segs" type="number" value="6" min="2" max="20"></div>
+    </div>
+
+    <div class="sec-hdr"><span class="sec-title">Network State</span></div>
+    <div class="sec-body">
+      <div id="network-summary" class="info-box">Loading plant state...</div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: results -->
+  <div class="right">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('pareto')">Pareto Front</button>
+      <button class="tab" onclick="switchTab('convergence')">Convergence</button>
+      <button class="tab" onclick="switchTab('results')">Best Solution</button>
+      <button class="tab" onclick="switchTab('log')">Run Log</button>
+    </div>
+
+    <div class="tab-body active" id="tab-pareto" style="padding:8px">
+      <canvas id="pareto-canvas" height="420"></canvas>
+      <div style="padding:6px;font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="pareto-info">
+        Configure objectives and decision variables, then click Run NSGA-II.
+      </div>
+    </div>
+
+    <div class="tab-body" id="tab-convergence" style="padding:8px">
+      <canvas id="conv-canvas" height="420"></canvas>
+    </div>
+
+    <div class="tab-body" id="tab-results" style="padding:12px">
+      <div id="results-body">
+        <div class="info-box">Run optimization to see best solution.</div>
+      </div>
+    </div>
+
+    <div class="tab-body" id="tab-log" style="padding:12px">
+      <div id="run-log" style="font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.8;white-space:pre-wrap">
+        Run log will appear here.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="dot" id="sdot2"></div>
+  <span id="stxt2">Idle</span>
+  <span style="flex:1"></span>
+  <span id="opt-progress"></span>
+</div>
+
+<script>
+const API='';
+const COLORS=['#f0a030','#18d8b0','#4a90f5','#d050c8','#40c878','#e84040'];
+let STATE={nodes:[],result:null,plant_name:'Plant'};
+let OPT={dvars:[],objectives:[]};
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function api(method,path,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  try{const r=await fetch(API+path,opts);return r.json();}
+  catch(e){return{status:'error',message:e.message};}
+}
+function setStatus(cls,msg){
+  ['sdot','sdot2'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='dot '+(cls||'');});
+  ['stxt','stxt2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=msg;});
+}
+function switchTab(name){
+  document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name)?.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>{
+    if((t.getAttribute('onclick')||'').includes("'"+name+"'"))t.classList.add('active');
+  });
+}
+
+// Load state from sessionStorage (passed from main window)
+function loadState(){
+  try{
+    const raw=sessionStorage.getItem('nl_optimizer_state');
+    if(raw)STATE=JSON.parse(raw);
+  }catch(e){}
+  const cstrNodes=STATE.nodes.filter(n=>n.type==='cstr');
+  const summary=document.getElementById('network-summary');
+  if(summary){
+    summary.innerHTML=`<strong>${STATE.plant_name||'Plant'}</strong><br>`
+      +`CSTRs: ${cstrNodes.length} | `
+      +`Simulated: ${STATE.result?'Yes':'No'}`;
+  }
+  // Pre-populate default dvars and objectives if none yet
+  if(!OPT.dvars.length&&cstrNodes.length){
+    cstrNodes.forEach(n=>{
+      OPT.dvars.push({name:'V_'+n.label,target_type:'reactor_volume',target_name:n.label,lower:50,upper:2000});
+    });
+    const first=cstrNodes[0];
+    const sp=first.config?.species||[];
+    const prod=sp.length>1?(sp[sp.length-1].name||sp[sp.length-1]):'B';
+    OPT.objectives.push({type:'yield',reactor:first.label,species:prod,direction:'maximize'});
+    OPT.objectives.push({type:'residence_time',reactor:first.label,direction:'minimize'});
+  }
+  renderDVars();renderObjectives();
+}
+
+function _cstrLabels(){return (STATE.nodes||[]).filter(n=>n.type==='cstr').map(n=>n.label);}
+
+function renderDVars(){
+  const el=document.getElementById('dv-list');
+  if(!OPT.dvars.length){el.innerHTML='<div class="info-box">No decision variables.</div>';return;}
+  const vtypes=['reactor_volume','feed_flow','temperature','pipe_flow','pipe_diameter'];
+  el.innerHTML=OPT.dvars.map((dv,i)=>{
+    const rtOpts=_cstrLabels().map(l=>`<option value="${l}"${dv.target_name===l?' selected':''}>${esc(l)}</option>`).join('');
+    const vtOpts=vtypes.map(t=>`<option value="${t}"${dv.target_type===t?' selected':''}>${t}</option>`).join('');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;gap:5px;margin-bottom:4px">
+        <input class="fi" value="${esc(dv.name)}" style="flex:1;font-size:10px" oninput="OPT.dvars[${i}].name=this.value">
+        <button class="xbtn" onclick="OPT.dvars.splice(${i},1);renderDVars()">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">TYPE</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.dvars[${i}].target_type=this.value">${vtOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">REACTOR</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.dvars[${i}].target_name=this.value">${rtOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">LOWER</div>
+          <input class="fi" type="number" value="${dv.lower}" style="font-size:10px" oninput="OPT.dvars[${i}].lower=+this.value"></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">UPPER</div>
+          <input class="fi" type="number" value="${dv.upper}" style="font-size:10px" oninput="OPT.dvars[${i}].upper=+this.value"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderObjectives(){
+  const el=document.getElementById('obj-list');
+  if(!OPT.objectives.length){el.innerHTML='<div class="info-box">No objectives.</div>';return;}
+  const otypes=['yield','conversion','residence_time','compressor_power'];
+  el.innerHTML=OPT.objectives.map((o,i)=>{
+    const rtOpts=_cstrLabels().map(l=>`<option value="${l}"${o.reactor===l?' selected':''}>${esc(l)}</option>`).join('');
+    const otOpts=otypes.map(t=>`<option value="${t}"${o.type===t?' selected':''}>${t}</option>`).join('');
+    const needsSp=o.type==='yield'||o.type==='conversion';
+    const spList=(STATE.nodes.find(n=>n.label===o.reactor)?.config?.species||[]);
+    const spOpts=spList.map(s=>{
+      const nm=typeof s==='string'?s:(s.name||'');
+      return`<option value="${nm}"${o.species===nm?' selected':''}>${esc(nm)}</option>`;
+    }).join('');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--amber);flex:1">Obj ${i+1}</span>
+        <button class="xbtn" onclick="OPT.objectives.splice(${i},1);renderObjectives()">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">TYPE</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.objectives[${i}].type=this.value;renderObjectives()">${otOpts}</select></div>
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">REACTOR</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.objectives[${i}].reactor=this.value;renderObjectives()">${rtOpts}</select></div>
+        ${needsSp?`<div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">SPECIES</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.objectives[${i}].species=this.value">${spOpts||`<option value="${esc(o.species||'')}">${esc(o.species||'?')}</option>`}</select></div>`:''}
+        <div><div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">DIRECTION</div>
+          <select class="fi" style="font-size:10px" onchange="OPT.objectives[${i}].direction=this.value">
+            <option value="maximize"${o.direction==='maximize'?' selected':''}>Maximize</option>
+            <option value="minimize"${o.direction==='minimize'?' selected':''}>Minimize</option>
+          </select></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addDVar(){
+  const labels=_cstrLabels();
+  OPT.dvars.push({name:'V_new',target_type:'reactor_volume',target_name:labels[0]||'',lower:50,upper:2000});
+  renderDVars();
+}
+function addObjective(){
+  const labels=_cstrLabels();
+  OPT.objectives.push({type:'yield',reactor:labels[0]||'',species:'B',direction:'maximize'});
+  renderObjectives();
+}
+
+async function runOptimizer(){
+  if(!OPT.dvars.length||!OPT.objectives.length){
+    alert('Define at least one decision variable and one objective.');return;
+  }
+  setStatus('run','Running optimizer...');
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('run-log').textContent='Starting optimization...\n';
+
+  const body={
+    decision_variables:OPT.dvars,
+    objectives:OPT.objectives,
+    method:document.getElementById('opt-method').value,
+    pop_size:parseInt(document.getElementById('opt-pop').value)||20,
+    n_gen:parseInt(document.getElementById('opt-gen').value)||10,
+    sim_t_end:parseFloat(document.getElementById('opt-tend').value)||200,
+    sim_n_segments:parseInt(document.getElementById('opt-segs').value)||6,
+    mode:document.getElementById('opt-method').value==='nsga2'?'pareto':'single',
+  };
+
+  const r=await api('POST','/api/optimize',body);
+  document.getElementById('run-btn').disabled=false;
+  if(r.status!=='ok'){
+    setStatus('err','Optimization failed');
+    document.getElementById('run-log').textContent+='ERROR: '+(r.message||'unknown')+'\n';
+    return;
+  }
+  setStatus('ok','Optimization complete');
+  const data=r.data;
+  document.getElementById('run-log').textContent+=`Complete.\nObjectives: ${JSON.stringify(data.optimal_objectives||[])}\n`;
+  drawPareto(data);
+  drawConvergence(data);
+  renderResults(data);
+  switchTab('pareto');
+}
+
+function drawPareto(data){
+  const can=document.getElementById('pareto-canvas');
+  const W=can.parentElement.clientWidth-16||600;can.width=W;
+  const H=parseInt(can.getAttribute('height'))||420;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const pf=data?.pareto_F;
+  if(!pf?.length){
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code,monospace';ctx.textAlign='center';
+    ctx.fillText('No Pareto data available.',W/2,H/2);
+    document.getElementById('pareto-info').textContent='Run optimization to generate Pareto front.';
+    return;
+  }
+  if(pf[0]?.length>=2){
+    const xs=pf.map(p=>p[0]),ys=pf.map(p=>p[1]);
+    const xMin=Math.min(...xs),xMax=Math.max(...xs)||xMin+1;
+    const yMin=Math.min(...ys),yMax=Math.max(...ys)||yMin+1;
+    const Pd={l:56,r:16,t:20,b:34};const pw=W-Pd.l-Pd.r,ph=H-Pd.t-Pd.b;
+    ctx.setLineDash([2,4]);ctx.strokeStyle='#1c2d47';ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y=Pd.t+(i/4)*ph;ctx.beginPath();ctx.moveTo(Pd.l,y);ctx.lineTo(W-Pd.r,y);ctx.stroke();
+      ctx.fillStyle='#3a5472';ctx.font='8px Fira Code';ctx.textAlign='right';
+      ctx.fillText((yMax-(i/4)*(yMax-yMin)).toFixed(3),Pd.l-3,y+3);
+      const x=Pd.l+(i/4)*pw;ctx.beginPath();ctx.moveTo(x,Pd.t);ctx.lineTo(x,H-Pd.b);ctx.stroke();
+      ctx.fillStyle='#3a5472';ctx.textAlign='center';
+      ctx.fillText((xMin+(i/4)*(xMax-xMin)).toFixed(3),x,H-Pd.b+14);
+    }
+    ctx.setLineDash([]);
+    pf.forEach((p,i)=>{
+      const x=Pd.l+((p[0]-xMin)/(xMax-xMin||1))*pw;
+      const y=Pd.t+ph-((p[1]-yMin)/(yMax-yMin||1))*ph;
+      ctx.fillStyle=COLORS[0];ctx.shadowColor=COLORS[0];ctx.shadowBlur=5;
+      ctx.beginPath();ctx.arc(x,y,5,0,2*Math.PI);ctx.fill();
+    });
+    ctx.shadowBlur=0;
+    document.getElementById('pareto-info').textContent=`${pf.length} Pareto-optimal solutions found.`;
+  }else{
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code';ctx.textAlign='center';
+    ctx.fillText('Single-objective result (no 2D front).',W/2,H/2);
+    document.getElementById('pareto-info').textContent=`Best: ${JSON.stringify(data.optimal_objectives)}`;
+  }
+}
+
+function drawConvergence(data){
+  const can=document.getElementById('conv-canvas');
+  const W=can.parentElement.clientWidth-16||600;can.width=W;
+  const H=parseInt(can.getAttribute('height'))||420;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const hist=data?.convergence_history;
+  if(!hist?.length){
+    ctx.fillStyle='#3a5472';ctx.font='11px Fira Code';ctx.textAlign='center';
+    ctx.fillText('No convergence history.',W/2,H/2);return;
+  }
+  const Pd={l:56,r:16,t:20,b:34};const pw=W-Pd.l-Pd.r,ph=H-Pd.t-Pd.b;
+  const yMin=Math.min(...hist),yMax=Math.max(...hist)||yMin+1;
+  const tx=i=>Pd.l+(i/(hist.length-1||1))*pw;
+  const ty=v=>Pd.t+ph-((v-yMin)/(yMax-yMin||1))*ph;
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#1c2d47';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=Pd.t+(i/4)*ph;ctx.beginPath();ctx.moveTo(Pd.l,y);ctx.lineTo(W-Pd.r,y);ctx.stroke();
+    ctx.fillStyle='#3a5472';ctx.font='8px Fira Code';ctx.textAlign='right';
+    ctx.fillText((yMax-(i/4)*(yMax-yMin)).toFixed(4),Pd.l-3,y+3);
+  }
+  ctx.setLineDash([]);
+  ctx.strokeStyle=COLORS[1];ctx.lineWidth=2;ctx.shadowColor=COLORS[1];ctx.shadowBlur=4;
+  ctx.beginPath();hist.forEach((v,i)=>i?ctx.lineTo(tx(i),ty(v)):ctx.moveTo(tx(i),ty(v)));
+  ctx.stroke();ctx.shadowBlur=0;
+  ctx.fillStyle='#3a5472';ctx.font='9px Barlow';ctx.textAlign='center';
+  ctx.fillText('Generation',Pd.l+pw/2,H-2);
+}
+
+function renderResults(data){
+  const el=document.getElementById('results-body');
+  if(!data?.optimal_x){el.innerHTML='<div class="info-box">No solution returned.</div>';return;}
+  const dvNames=OPT.dvars.map(d=>d.name);
+  el.innerHTML=`
+    <h3 style="color:var(--teal);font-family:var(--mono);font-size:12px;margin-bottom:12px">Best Objective Values</h3>
+    <table class="res-table" style="margin-bottom:16px">
+      <thead><tr><th>Objective</th><th>Value</th><th>Direction</th></tr></thead>
+      <tbody>${(data.optimal_objectives||[]).map((v,i)=>`
+        <tr><td style="color:var(--teal)">${OPT.objectives[i]?.type||'Obj '+i} — ${OPT.objectives[i]?.reactor||''}</td>
+          <td style="color:var(--amber);font-family:var(--mono)">${typeof v==='number'?v.toFixed(5):v}</td>
+          <td style="color:var(--text-dim)">${OPT.objectives[i]?.direction||''}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <h3 style="color:var(--teal);font-family:var(--mono);font-size:12px;margin-bottom:12px">Decision Variable Values</h3>
+    <table class="res-table">
+      <thead><tr><th>Variable</th><th>Value</th><th>Bounds</th></tr></thead>
+      <tbody>${(data.optimal_x||[]).map((v,i)=>`
+        <tr><td style="color:var(--text-bright)">${dvNames[i]||'DV '+i}</td>
+          <td style="color:var(--amber);font-family:var(--mono)">${typeof v==='number'?v.toFixed(4):v}</td>
+          <td style="color:var(--text-dim)">[${OPT.dvars[i]?.lower}, ${OPT.dvars[i]?.upper}]</td></tr>`).join('')}
+      </tbody>
+    </table>
+    ${data.n_pareto_solutions?`<p style="margin-top:12px;font-family:var(--mono);font-size:10px;color:var(--text-dim)">${data.n_pareto_solutions} Pareto-optimal solutions found.</p>`:''}`;
+}
+
+// Init
+loadState();
+api('GET','/api/status').then(r=>{
+  if(r.status==='ok')setStatus('ok',`Connected — ChemSim:${r.data.chemsim?'ok':'missing'}`);
+  else setStatus('err','API offline');
+});
+</script>
+</body>
+</html>

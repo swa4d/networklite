@@ -5,6 +5,7 @@
 <title>NetworkLite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Barlow:wght@300;400;500;600&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
 <style>
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ VARS */
 :root{
@@ -278,6 +279,21 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
 /* Run-dry error state */
 .node-error .ws-node-bg{stroke:var(--red)!important;fill:rgba(232,64,64,.12)!important}
 .node-error .ws-label{fill:var(--red)!important}
+.node-overflow .ws-node-bg{stroke:#4a90f5!important;fill:rgba(74,144,245,.12)!important}
+.node-overflow .ws-label{fill:#4a90f5!important}
+.main-tab{height:30px;padding:0 16px;border:none;background:transparent;color:var(--text-dim);font-family:var(--mono);font-size:10px;letter-spacing:.5px;cursor:pointer;border-bottom:2px solid transparent;transition:all .13s;margin-bottom:-1px}
+.main-tab:hover{color:var(--text)}
+.main-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+#screen-cc{flex:1;display:flex;min-height:0}
+#screen-dash{display:none;flex:1;min-height:0;overflow:hidden}
+#screen-opt{display:none;flex:1;min-height:0;overflow:hidden}
+.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,1fr);gap:8px;padding:10px;height:100%;box-sizing:border-box}
+.dash-slot{background:var(--surface2);border:1px solid var(--border);border-radius:4px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.dash-slot-hdr{height:30px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;gap:6px;flex-shrink:0}
+.dash-slot-title{font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);flex:1}
+.dash-slot-body{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
+.dash-slot-body img{max-width:100%;max-height:100%;object-fit:contain}
+.opt-frame{width:100%;height:100%;border:none;background:var(--bg)}
 /* Fix proposal modal */
 .fix-proposal{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:6px}
 .fix-proposal.priority-1{border-color:var(--teal)}
@@ -285,15 +301,32 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
 .fix-priority{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
 .fix-desc{font-family:var(--sans);font-size:11px;color:var(--text);line-height:1.5;margin-bottom:5px}
 .fix-value{font-family:var(--mono);font-size:11px;color:var(--amber)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ V3 STOCHASTIC */
+.sim-mode-toggle{display:flex;background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:2px;gap:2px}
+.sim-mode-btn{flex:1;height:22px;border:none;border-radius:18px;font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:all .18s;color:var(--text-dim);background:transparent}
+.sim-mode-btn.active-ideal{background:var(--blue);color:#fff;box-shadow:0 0 8px rgba(74,144,245,.4)}
+.sim-mode-btn.active-stoch{background:var(--pink);color:#fff;box-shadow:0 0 8px rgba(208,80,200,.45)}
+.stoch-params{display:none;margin-top:4px;padding:6px;background:rgba(208,80,200,.06);border:1px solid rgba(208,80,200,.22);border-radius:4px;display:none;flex-direction:column;gap:4px}
+.stoch-params.open{display:flex}
+.ssa-badge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1.5px;padding:2px 7px;border-radius:10px;background:rgba(208,80,200,.15);border:1px solid var(--pink);color:var(--pink);display:none}
+.ssa-badge.visible{display:inline-block}
+/* 3D PDF tab */
+#r-plotly-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+#r-plotly-container{flex:1;min-height:0;background:var(--bg)}
+.pdf-species-sel{background:var(--surface);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:3px;outline:none;cursor:pointer}
+.pdf-species-sel:focus{border-color:var(--pink)}
+.pdf-info-bar{padding:5px 10px;font-family:var(--mono);font-size:9px;color:var(--text-dim);border-top:1px solid var(--border);letter-spacing:.3px;flex-shrink:0}
 </style>
 </head>
 <body>
 
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ HEADER -->
 <div class="hdr">
-  <div class="logo">NETWORK<em>LITE</em><span>v2.0</span></div>
+  <div class="logo">NETWORK<em>LITE</em><span>v3.0</span></div>
   <div class="dot" id="sdot"></div>
   <div class="status-txt" id="stxt">Ready</div>
+  <div class="ssa-badge" id="ssa-badge">SSA</div>
   <div style="width:1px;height:18px;background:var(--border);margin:0 6px"></div>
   <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">ENERGY</div>
   <div style="font-family:var(--mono);font-size:12px;color:var(--amber)" id="energy-draw">0.00 kW</div>
@@ -310,8 +343,29 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
   <button class="btn pri sm" id="run-btn" onclick="runSimulation()">Run Simulation</button>
 </div>
 
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ DASHBOARD SCREEN -->
+</div><!-- close screen-cc -->
+<div id="screen-dash">
+  <div class="dash-grid" id="dash-grid">
+    <!-- 6 configurable slots rendered by JS -->
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ OPTIMIZER SCREEN -->
+<div id="screen-opt">
+  <iframe id="opt-iframe" class="opt-frame" src="/optimizer"></iframe>
+</div>
+
+
+
 <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ MAIN -->
-<div class="main">
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TAB BAR -->
+<div id="main-tabs" style="height:34px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:0 12px;gap:2px;flex-shrink:0">
+  <button class="main-tab active" id="mtab-cc"   onclick="switchMainTab('cc')">Control Center</button>
+  <button class="main-tab"        id="mtab-dash" onclick="switchMainTab('dash')">Dashboard</button>
+  <button class="main-tab"        id="mtab-opt"  onclick="switchMainTab('opt')">Optimizer</button>
+</div>
+<div id="screen-cc" class="main">
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ LEFT PANEL -->
   <div class="left">
@@ -376,10 +430,34 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
     <div class="sec" style="flex-shrink:0">
       <div class="sec-hdr"><span class="sec-title">Simulation</span></div>
       <div class="sec-body flex">
-        <div class="fr"><span class="fl">t end (s)</span><input class="fi" id="p-tend" type="number" value="200" min="1"></div>
-        <div class="fr"><span class="fl">Segments</span><input class="fi" id="p-segs" type="number" value="8" min="1" max="50"></div>
+        <!-- V3 Mode toggle -->
+        <div class="sim-mode-toggle" id="sim-mode-toggle">
+          <button class="sim-mode-btn active-ideal" id="mode-ideal-btn" onclick="setSimMode('deterministic')">Ideal Model</button>
+          <button class="sim-mode-btn" id="mode-stoch-btn" onclick="setSimMode('stochastic')">Stochastic Reality</button>
+        </div>
+        <!-- Deterministic params -->
+        <div id="det-params">
+          <div class="fr"><span class="fl">t end (s)</span><input class="fi" id="p-tend" type="number" value="200" min="1"></div>
+          <div class="fr"><span class="fl">Segments</span><input class="fi" id="p-segs" type="number" value="8" min="1" max="50"></div>
+        </div>
+        <!-- Stochastic params -->
+        <div class="stoch-params" id="stoch-params">
+          <div class="fr"><span class="fl">t end (s)</span><input class="fi" id="p-tend-s" type="number" value="200" min="1"></div>
+          <div class="fr"><span class="fl">Trajectories</span><input class="fi" id="p-ntraj" type="number" value="30" min="5" max="200"></div>
+          <div class="fr" title="Ω: noise/speed trade-off. Higher = less noise, slower."><span class="fl">Ω (omega)</span><input class="fi" id="p-omega" type="number" value="300" min="50" max="2000"></div>
+          <div class="fr"><span class="fl">τ-leap ε</span><input class="fi" id="p-taueps" type="number" value="0.03" step="0.01" min="0.005" max="0.1"></div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--pink);padding:2px 0;line-height:1.5">Gillespie SSA · Cao τ-leaping<br>Ω↑ = less noise &amp; slower</div>
+        </div>
         <div class="fr"><span class="fl">Plant name</span><input class="fi" id="p-name" value="My Plant" style="font-size:11px"></div>
         <button class="btn sm teal" style="width:100%;margin-top:2px" onclick="autoBalance()">Auto-Balance</button>
+        <div style="display:flex;gap:4px;margin-top:2px">
+          <button class="btn sm" style="flex:1" onclick="seekSteadyState()" title="Iteratively extend simulation until concentrations converge">Seek Steady State</button>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">tol%</span>
+            <input class="fi" id="ss-tol" type="number" value="1" step="0.1" min="0.01" style="width:44px;font-size:10px" title="CoV tolerance % for convergence">
+          </div>
+        </div>
+        <div id="ss-result" style="display:none;font-family:var(--mono);font-size:10px;padding:4px 6px;border-radius:3px;margin-top:2px"></div>
       </div>
     </div>
 
@@ -527,6 +605,7 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
           <button class="tab" onclick="switchTab('r','reactions')">Reactions</button>
           <button class="tab" onclick="switchTab('r','outlet')">Outlet</button>
           <button class="tab" onclick="switchTab('r','connections')">Connections</button>
+          <button class="tab" id="r-tab-pdf-btn" onclick="switchTab('r','pdf');renderStochasticTab()" style="color:var(--pink);display:none">PDF Density</button>
         </div>
         <!-- Info tab -->
         <div class="tab-body active" id="r-tab-info">
@@ -591,8 +670,8 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
             </div>
             <div class="add-form-wrap" id="r-add-rxn">
               <div class="add-form">
-                <div class="fr"><span class="fl">Reactants</span><input class="fi" id="r-rr" placeholder="A B (space-sep)"></div>
-                <div class="fr"><span class="fl">Products</span><input class="fi" id="r-rp" placeholder="C"></div>
+                <div class="fr"><span class="fl">Reactants</span><input class="fi" id="r-rr" placeholder="A B or 2A+B"></div>
+                <div class="fr"><span class="fl">Products</span><input class="fi" id="r-rp" placeholder="C or 2C"></div>
                 <div class="fr"><span class="fl">Rate k</span><input class="fi" id="r-rk" type="number" value="0.05" step="any"></div>
                 <div class="fr"><span class="fl">Ea (J/mol)</span><input class="fi" id="r-rea" type="number" value="0"></div>
                 <div class="fr"><span class="fl">A (pre-exp)</span><input class="fi" id="r-ra" type="number" value="0"></div>
@@ -623,6 +702,26 @@ canvas.tcanvas{display:block;width:100%;cursor:crosshair;border:1px solid var(--
             <div id="r-outlets"></div>
             <div class="ctx-label" style="margin:8px 0 5px">Error State</div>
             <div id="r-error-state" style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">No errors.</div>
+          </div>
+        </div>
+        <!-- PDF Density tab (V3 stochastic) -->
+        <div class="tab-body" id="r-tab-pdf" style="display:none">
+          <div id="r-plotly-wrap">
+            <!-- species selector + info row -->
+            <div style="padding:6px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <span style="font-family:var(--mono);font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">SPECIES</span>
+              <select class="pdf-species-sel" id="pdf-species-sel" onchange="renderStochasticTab()"></select>
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)" id="pdf-traj-info"></span>
+              <div class="hdr-sep"></div>
+              <label style="font-family:var(--mono);font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="pdf-show-spaghetti" onchange="renderStochasticTab()" style="accent-color:var(--pink)"> spaghetti
+              </label>
+            </div>
+            <!-- Plotly container -->
+            <div id="r-plotly-container"></div>
+            <div class="pdf-info-bar" id="pdf-info-bar">
+              Select species above · Probability density surface: X=time, Y=concentration, Z=P(C,t)
+            </div>
           </div>
         </div>
       </div>
@@ -842,7 +941,8 @@ const API='';  // same origin
 let PLANT = {
   nodes: [],   // {id, type:'source'|'cstr'|'sink', label, x, y, config:{}}
   edges: [],   // {id, src, tgt, config:{}}
-  result: null // from /api/simulate
+  result: null,// from /api/simulate
+  simMode: 'deterministic', // v3.0: 'deterministic' | 'stochastic'
 };
 
 let UI = {
@@ -859,6 +959,7 @@ let UI = {
   rTMode: 'constant',
   optDVars: [],
   optObjectives: [],
+  stochReactorLabel: null,  // v3.0: reactor label currently open in PDF tab
 };
 
 let _nodeCounter = 0;
@@ -932,18 +1033,22 @@ function nodeShape(node){
   }
   const isSelected=UI.selected&&UI.selected.type==='node'&&UI.selected.id===id;
   const isError=PLANT.result?.run_dry_reactors?.includes(node.label);
+  const isOverflow=PLANT.result?.overflow_reactors?.includes(node.label);
   const glowFilter=isSelected?`filter="url(#glow-${type==='cstr'?'amber':'teal'})"`:'';;
   const outPort=type!=='sink'?`<circle class="ws-port out-port" data-node="${id}" data-dir="out"
     cx="${x+r}" cy="${y}" r="5" fill="${c}44" stroke="${c}" stroke-width="1" data-cx="${x+r}" data-cy="${y}"/>`:'';;
   const inPort=type!=='source'?`<circle class="ws-port in-port" data-node="${id}" data-dir="in"
     cx="${x-r}" cy="${y}" r="5" fill="${c}44" stroke="${c}" stroke-width="1" data-cx="${x-r}" data-cy="${y}"/>`:'';;
   const selRing=isSelected?`<circle cx="${x}" cy="${y}" r="${r+6}" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>`:'';;
+  const errBadge=isError?`<text x="${x}" y="${y-r-5}" style="font-family:var(--mono);font-size:8px;fill:#e84040;text-anchor:middle;font-weight:700">DRY</text>`
+    :isOverflow?`<text x="${x}" y="${y-r-5}" style="font-family:var(--mono);font-size:8px;fill:#4a90f5;text-anchor:middle;font-weight:700">OVERFLOW</text>`
+    :'';
   const typeLabel=type.toUpperCase();
-  return`<g class="ws-node-g${isError?' node-error':''}" data-id="${id}" ${glowFilter} style="cursor:grab">
+  return`<g class="ws-node-g${isError?' node-error':isOverflow?' node-overflow':''}" data-id="${id}" ${glowFilter} style="cursor:grab">
     ${selRing}${shapeEl}
     <text class="ws-label" x="${x}" y="${y-5}">${esc(label)}</text>
     <text class="ws-label ws-label-sub" x="${x}" y="${y+9}">${typeLabel}</text>
-    ${outPort}${inPort}
+    ${errBadge}${outPort}${inPort}
   </g>`;
 }
 
@@ -1344,9 +1449,22 @@ async function runSimulation(){
   setStatus('run','Syncing plant...');
   document.getElementById('run-btn').disabled=true;
 
-  const t_end=parseFloat(document.getElementById('p-tend').value)||200;
-  const n_segs=parseInt(document.getElementById('p-segs').value)||8;
-  const pname=document.getElementById('p-name').value||'Plant';
+  const isStoch = (PLANT.simMode === 'stochastic');
+
+  // Read params from whichever panel is active
+  const t_end  = parseFloat(document.getElementById(isStoch?'p-tend-s':'p-tend').value)||200;
+  const n_segs = isStoch ? 10 : (parseInt(document.getElementById('p-segs').value)||8);
+  const pname  = document.getElementById('p-name').value||'Plant';
+
+  // Stochastic-specific params
+  const simPayload = {t_end, n_segments:n_segs, mode: PLANT.simMode||'deterministic'};
+  if(isStoch){
+    simPayload.n_trajectories = parseInt(document.getElementById('p-ntraj').value)||30;
+    simPayload.omega          = parseInt(document.getElementById('p-omega').value)||300;
+    simPayload.tau_eps        = parseFloat(document.getElementById('p-taueps').value)||0.03;
+    simPayload.n_samples      = 80;
+    setStatus('run',`Gillespie SSA — ${simPayload.n_trajectories} trajectories Ω=${simPayload.omega}...`);
+  }
 
   // Build edge list with resolved labels and v2 config (pump_efficiency, not inlet_pressure_Pa)
   const edgesWithLabels=PLANT.edges.map(e=>{
@@ -1384,10 +1502,15 @@ async function runSimulation(){
   toast(`Plant synced: ${syncR.data.n_reactors} reactor(s), ${syncR.data.n_connections} connection(s).`);
 
   setStatus('run',`Simulating ${syncR.data.n_reactors} reactor(s)...`);
-  const r=await api('POST','/api/simulate',{t_end,n_segments:n_segs});
+  const r=await api('POST','/api/simulate', simPayload);
   if(r.status==='ok'){
     PLANT.result=r.data;
-    setStatus('ok',`Done — ${t_end}s simulated`);
+    // SSA badge
+    const ssaBadge=document.getElementById('ssa-badge');
+    if(ssaBadge) ssaBadge.classList.toggle('visible', isStoch);
+    setStatus('ok', isStoch
+      ? `SSA done — ${simPayload.n_trajectories} traj × ${t_end}s`
+      : `Done — ${t_end}s simulated`);
     // v2: update pump energy display
     const pumpKW=(r.data.total_pump_kW||0).toFixed(3);
     document.getElementById('energy-draw').textContent=pumpKW+' kW';
@@ -1405,12 +1528,18 @@ async function runSimulation(){
     }
     // Run-dry badge
     const rdBadge=document.getElementById('run-dry-badge');
-    const hasDry=(r.data.run_dry_reactors||[]).length>0;
-    rdBadge.style.display=hasDry?'':' none';
-    if(hasDry){toast('WARNING: Run-dry detected in '+r.data.run_dry_reactors.join(', ')+'. Use Auto-Balance to fix.',5000);}
-    else toast('Simulation complete.');
+    const dry=(r.data.run_dry_reactors||[]);
+    const overflow=(r.data.overflow_reactors||[]);
+    const hasDry=dry.length>0;
+    const hasOverflow=overflow.length>0;
+    rdBadge.style.display=hasDry?'':'none';
+    if(hasDry)toast('⚠ Run-dry: '+dry.join(', ')+'. Use Auto-Balance.',5000);
+    if(hasOverflow)toast('⚠ Overflow: '+overflow.join(', ')+'. Inlet exceeds outlet — adjust pipe flows.',5000);
+    if(!hasDry&&!hasOverflow)toast('Simulation complete — network converged.');
     renderWorkspace();
     renderContextPanel();
+    // Auto-refresh dashboard if it is visible
+    if(document.getElementById('screen-dash')?.style.display!=='none') refreshDashboard();
   }else{
     setStatus('err','Simulation failed');
     toast('Simulation error: '+(r.message||'check Flask console'));
@@ -1419,7 +1548,7 @@ async function runSimulation(){
 }
 
 async function loadExample(ex){
-  setStatus('run','Loading...');
+  setStatus('run','Loading example...');
   const r=await api('POST','/api/build_example',{example:ex});
   if(r.status!=='ok'){
     toast('Failed to load example: '+(r.message||''));
@@ -1441,7 +1570,7 @@ async function loadExample(ex){
   const spacing=Math.min(180,(W-160)/Math.max(ns.length,1));
   ns.forEach((n,i)=>{
     const x=90+i*spacing;
-    const y=H/2+(i%2===0?-30:30);
+    const y=H/2+(i%2===0?-40:40);
     PLANT.nodes.push({id:nodeId(),type:n.node_type||'cstr',label:n.id,x,y,config:{
       volume_L:n.volume_L||200,
       pressure_kPa:n.pressure_kPa||101.325,
@@ -1461,9 +1590,26 @@ async function loadExample(ex){
       }});
   });
 
-  setStatus('ok',`${ex} example loaded — click Run Simulation`);
-  toast(`${ex} example loaded.`);
   renderWorkspace();renderContextPanel();
+  setStatus('run',`${ex} example loaded — simulating...`);
+  toast(`${ex} example loaded. Running simulation...`);
+
+  // Auto-simulate immediately so the example shows results
+  const simR=await api('POST','/api/simulate',{t_end:200,n_segments:8});
+  if(simR.status==='ok'){
+    PLANT.result=simR.data;
+    const kw=(simR.data.total_pump_kW||0).toFixed(3);
+    document.getElementById('energy-draw').textContent=kw+' kW';
+    const dry=simR.data.run_dry_reactors||[];
+    const overflow=simR.data.overflow_reactors||[];
+    setStatus('ok',`${ex} ready — ${dry.length?'⚠ run-dry':'converged'}${overflow.length?' ⚠ overflow':''}`);
+    if(dry.length) toast('Warning: run-dry detected in '+dry.join(', ')+'. Use Auto-Balance.',5000);
+    else toast(`${ex} simulation complete.`);
+    renderWorkspace();renderContextPanel();
+  }else{
+    setStatus('err','Example simulation failed: '+(simR.message||''));
+    toast('Simulation failed: '+(simR.message||''));
+  }
 }
 
 /* ════════════════════════════════════════════════════════════ AUTO BALANCE v2 */
@@ -1729,14 +1875,35 @@ function openReactorModal(node){
   renderRConnections(node.id);
   // Clear old conc table if reopening
   const oldTbl=document.getElementById('conc-num-table');if(oldTbl)oldTbl.remove();
+
+  // ── V3: show/hide PDF tab based on stochastic mode OR existing stochastic data ─
+  const pdfBtn=document.getElementById('r-tab-pdf-btn');
+  // Show PDF tab if: (a) we just ran SSA mode, OR (b) this reactor already has stochastic data
+  const isStochMode=(PLANT.simMode==='stochastic');
+  const hasStoch=!!(rr?.stochastic_data) || isStochMode;
+  if(pdfBtn) pdfBtn.style.display=hasStoch?'':'none';
+  // Store current label for stochastic renderer
+  UI.stochReactorLabel=node.label;
+
   UI.tlData=buildTLData(node.label);
   UI.tlFrame=0;UI.tlPlaying=false;
   updateTL();drawRConcCanvas();
   openModal('reactor-modal');
-  // Async: fetch full time-series with conc_table from server
+  // Async: fetch full time-series + stochastic data from server
   if(PLANT.result){
     loadReactorPlotData(node.label).then(fullData=>{
-      if(fullData){UI.tlData=fullData;updateTL();drawRConcCanvas();}
+      if(!fullData) return;
+      UI.tlData=fullData;
+      updateTL();
+      // In stochastic mode: overlay mean±std bands on 2D canvas
+      if(fullData.simulation_mode==='stochastic') drawRConcCanvasStoch(fullData);
+      else drawRConcCanvas();
+      // Reveal PDF tab if stochastic data arrived OR mode is stochastic
+      const gotStoch=!!(fullData.stochastic_data) || (fullData.simulation_mode==='stochastic');
+      if(gotStoch && pdfBtn) pdfBtn.style.display='';
+      // Clear species selector so it gets rebuilt for this reactor
+      const sel=document.getElementById('pdf-species-sel');
+      if(sel) sel.innerHTML='';
     });
   }
 }
@@ -1759,7 +1926,11 @@ async function loadReactorPlotData(rLabel){
   if(imgEl&&d.trajectory){imgEl.src=d.trajectory;imgEl.style.display='block';}
   // Return data for timeline
   if(!d.time?.length)return null;
-  return{time:d.time, conc:d.conc, names:d.species||[], conc_table:d.conc_table||[]};
+  return{
+    time:d.time, conc:d.conc, names:d.species||[], conc_table:d.conc_table||[],
+    simulation_mode: d.simulation_mode||'deterministic',
+    stochastic_data: d.stochastic_data||null,
+  };
 }
 
 function renderRFeeds(cfg, nodeId){
@@ -1827,30 +1998,40 @@ function renderRReactions(cfg){
     el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:4px">No reactions defined.</div>';
     return;
   }
-  el.innerHTML=rxns.map((r,i)=>`
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:4px" id="rxn-row-${i}">
+  el.innerHTML=rxns.map((r,i)=>{
+    // Normalise: reactants may be string "A B" or array ["A","B"]
+    const rNames=Array.isArray(r.reactants)?r.reactants:String(r.reactants).split(/[\s+]+/).filter(Boolean);
+    const pNames=Array.isArray(r.products) ?r.products :String(r.products).split(/[\s+]+/).filter(Boolean);
+    const rStoich=r.reactant_stoich||rNames.map(()=>1);
+    const pStoich=r.product_stoich ||pNames.map(()=>1);
+    const rStr=rNames.map((n,j)=>(rStoich[j]!==1?rStoich[j]+'·':'')+n).join(' + ')||'?';
+    const pStr=pNames.map((n,j)=>(pStoich[j]!==1?pStoich[j]+'·':'')+n).join(' + ')||'?';
+    const rRaw=rNames.join(' '); const pRaw=pNames.join(' ');
+    return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;margin-bottom:4px" id="rxn-row-${i}">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
         <span style="font-family:var(--mono);font-size:10px;color:${clr(i)};min-width:16px">${i+1}.</span>
-        <input class="fi" id="rxn-r-${i}" value="${esc(r.reactants)}" style="width:70px;font-size:10px" title="Reactants (space-separated)">
+        <input class="fi" id="rxn-r-${i}" value="${esc(rRaw)}" style="width:80px;font-size:10px" title="Reactants (space-separated, prefix stoich: 2A)">
         <span style="color:var(--text-dim);font-family:var(--mono)">→</span>
-        <input class="fi" id="rxn-p-${i}" value="${esc(r.products)}" style="width:70px;font-size:10px" title="Products (space-separated)">
-        <button class="xbtn" onclick="removeReaction(${i})" title="Delete reaction">×</button>
+        <input class="fi" id="rxn-p-${i}" value="${esc(pRaw)}" style="width:80px;font-size:10px" title="Products">
+        <button class="xbtn" onclick="removeReaction(${i})" title="Delete">×</button>
       </div>
-      <div style="display:flex;gap:6px;padding-left:22px">
+      <div style="display:flex;gap:6px;padding-left:22px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:4px">
           <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">k=</span>
-          <input class="fi" id="rxn-k-${i}" type="number" value="${r.rate||0.05}" step="0.001" style="width:72px;font-size:10px" title="Rate constant k">
+          <input class="fi" id="rxn-k-${i}" type="number" value="${r.rate||0.05}" step="0.001" style="width:72px;font-size:10px">
         </div>
         <div style="display:flex;align-items:center;gap:4px">
           <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Ea=</span>
-          <input class="fi" id="rxn-ea-${i}" type="number" value="${r.activation_energy||0}" step="500" style="width:72px;font-size:10px" title="Activation energy J/mol">
+          <input class="fi" id="rxn-ea-${i}" type="number" value="${r.activation_energy||0}" step="500" style="width:72px;font-size:10px">
         </div>
         <div style="display:flex;align-items:center;gap:4px">
           <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">A=</span>
-          <input class="fi" id="rxn-a-${i}" type="number" value="${r.pre_exponential||0}" step="1e4" style="width:80px;font-size:10px" title="Pre-exponential factor">
+          <input class="fi" id="rxn-a-${i}" type="number" value="${r.pre_exponential||0}" step="1e4" style="width:80px;font-size:10px">
         </div>
       </div>
-    </div>`).join('');
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);padding-left:22px;margin-top:2px">${esc(rStr)} → ${esc(pStr)}</div>
+    </div>`;
+  }).join('');
 }
 
 function removeReaction(i){
@@ -1863,21 +2044,37 @@ function removeReaction(i){
 }
 
 function collectReactionsFromUI(cfg){
-  /* Read back all editable reaction fields into cfg.reactions */
+  /* Read back all editable reaction fields and normalise stoichiometry. */
+  function parseReactants(raw){
+    const tokens=raw.replace(/\+/g,' ').trim().split(/\s+/).filter(Boolean);
+    const names=[]; const stoichs=[];
+    tokens.forEach(tok=>{
+      const m=tok.match(/^(\d+\.?\d*)([A-Za-z_].*)$/);
+      if(m){stoichs.push(parseFloat(m[1]));names.push(m[2]);}
+      else{stoichs.push(1.0);names.push(tok);}
+    });
+    return{names,stoichs};
+  }
+
   const rxns=cfg.reactions||[];
-  rxns.forEach((r,i)=>{
+  return rxns.map((r,i)=>{
     const rEl=document.getElementById(`rxn-r-${i}`);
     const pEl=document.getElementById(`rxn-p-${i}`);
     const kEl=document.getElementById(`rxn-k-${i}`);
     const eaEl=document.getElementById(`rxn-ea-${i}`);
     const aEl=document.getElementById(`rxn-a-${i}`);
-    if(rEl) r.reactants=rEl.value.trim();
-    if(pEl) r.products=pEl.value.trim();
-    if(kEl) r.rate=parseFloat(kEl.value)||r.rate;
-    if(eaEl) r.activation_energy=parseFloat(eaEl.value)||0;
-    if(aEl)  r.pre_exponential=parseFloat(aEl.value)||0;
+    const rParsed=rEl?parseReactants(rEl.value):{names:String(r.reactants||'').split(' ').filter(Boolean),stoichs:[]};
+    const pParsed=pEl?parseReactants(pEl.value):{names:String(r.products||'').split(' ').filter(Boolean),stoichs:[]};
+    return{
+      reactants        : rParsed.names.join(' '),
+      products         : pParsed.names.join(' '),
+      reactant_stoich  : rParsed.stoichs,
+      product_stoich   : pParsed.stoichs,
+      rate             : kEl?parseFloat(kEl.value)||r.rate:r.rate,
+      activation_energy: eaEl?parseFloat(eaEl.value)||0:r.activation_energy||0,
+      pre_exponential  : aEl?parseFloat(aEl.value)||0:r.pre_exponential||0,
+    };
   });
-  return rxns;
 }
 
 function renderROutlet(rLabel){
@@ -1955,15 +2152,43 @@ function addSpeciesToReactor(){
 function addReactionToReactor(){
   if(!UI.inspectorNodeId)return;
   const node=PLANT.nodes.find(n=>n.id===UI.inspectorNodeId);
-  const rr=document.getElementById('r-rr').value.trim();
-  const rp=document.getElementById('r-rp').value.trim();
+  if(!node)return;
+
+  // Parse "2A + B" style or simple "A B" space-separated into [{name,stoich}]
+  function parseReactants(raw){
+    // Support both "A B C" and "A + B" formats; stoichiometry prefix like "2A"
+    const tokens=raw.replace(/\+/g,' ').trim().split(/\s+/).filter(Boolean);
+    const names=[]; const stoichs=[];
+    tokens.forEach(tok=>{
+      const m=tok.match(/^(\d+\.?\d*)([A-Za-z_].*)$/);
+      if(m){stoichs.push(parseFloat(m[1]));names.push(m[2]);}
+      else{stoichs.push(1.0);names.push(tok);}
+    });
+    return{names,stoichs};
+  }
+
+  const rrRaw=document.getElementById('r-rr').value.trim();
+  const rpRaw=document.getElementById('r-rp').value.trim();
+  if(!rrRaw||!rpRaw){toast('Enter reactants and products.');return;}
+
+  const reactants=parseReactants(rrRaw);
+  const products=parseReactants(rpRaw);
+
   const k=parseFloat(document.getElementById('r-rk').value)||0.05;
   const ea=parseFloat(document.getElementById('r-rea').value)||0;
   const a=parseFloat(document.getElementById('r-ra').value)||0;
-  if(!rr||!rp){toast('Enter reactants and products.');return;}
+
   if(!node.config.reactions)node.config.reactions=[];
-  node.config.reactions.push({reactants:rr,products:rp,rate:k,activation_energy:ea,pre_exponential:a});
-  renderRReactions(node.config);toggleAddForm('r-add-rxn');toast('Reaction added.');
+  node.config.reactions.push({
+    reactants:reactants.names.join(' '),
+    products:products.names.join(' '),
+    reactant_stoich:reactants.stoichs,
+    product_stoich:products.stoichs,
+    rate:k,activation_energy:ea,pre_exponential:a,
+  });
+  renderRReactions(node.config);
+  toggleAddForm('r-add-rxn');
+  toast(`Reaction added: ${rrRaw} → ${rpRaw} (k=${k})`);
 }
 
 /* ════════════════════════════════════════════════════════════════ TIMELINE */
@@ -2086,6 +2311,238 @@ function drawRConcCanvas(){
     ctx.fillStyle=COLORS[si%COLORS.length];
     ctx.fillText(nm,P.l+5+si*45,P.t+8);
   });
+}
+
+/* ══════════════════════════════════════════ STOCHASTIC CANVAS (mean ± std) */
+function drawRConcCanvasStoch(fullData){
+  // Guard: if no stochastic data (simulation failed, or in-flight), fall back gracefully
+  const sd=fullData?.stochastic_data;
+  if(!sd || !sd.mean || !sd.time || !sd.species_names){drawRConcCanvas();return;}
+  const can=document.getElementById('r-conc-canvas');
+  const W=can.parentElement.clientWidth-12||380;
+  const H=220;can.width=W;can.height=H;
+  const ctx=can.getContext('2d');
+  ctx.fillStyle='#07080e';ctx.fillRect(0,0,W,H);
+  const names=sd.species_names||[];
+  const meanArr=sd.mean||[];   // [T][M]
+  const stdArr =sd.std||[];
+  const p5Arr  =sd.p5||[];
+  const p95Arr =sd.p95||[];
+  const tArr   =sd.time||[];
+  if(!tArr.length){return;}
+  const P={l:46,r:12,t:12,b:26};
+  const pw=W-P.l-P.r,ph=H-P.t-P.b;
+  let cMax=0;
+  meanArr.forEach(row=>row.forEach((v,i)=>{
+    const hi=(p95Arr[meanArr.indexOf(row)]||[])[i]||v;
+    if(hi>cMax)cMax=hi;
+  }));
+  cMax=cMax*1.08||1;
+  const tMin=tArr[0],tMax=tArr[tArr.length-1],tR=tMax-tMin||1;
+  const tx=t=>P.l+(t-tMin)/tR*pw;
+  const ty=c=>P.t+ph-(Math.max(0,c)/cMax)*ph;
+  // Grid
+  ctx.setLineDash([2,4]);ctx.strokeStyle='#182a40';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const c=(i/4)*cMax,y=ty(c);
+    ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(W-P.r,y);ctx.stroke();
+    ctx.fillStyle='#3a5472';ctx.font='8px Fira Code,monospace';ctx.textAlign='right';
+    ctx.fillText(c.toFixed(c<10?2:0),P.l-3,y+3);
+  }
+  ctx.setLineDash([]);
+  names.forEach((nm,si)=>{
+    const col=COLORS[si%COLORS.length];
+    const T=tArr.length;
+    // p5–p95 shaded band
+    ctx.beginPath();
+    for(let ti=0;ti<T;ti++) ctx.lineTo(tx(tArr[ti]),ty((p95Arr[ti]||[])[si]||0));
+    for(let ti=T-1;ti>=0;ti--) ctx.lineTo(tx(tArr[ti]),ty((p5Arr[ti]||[])[si]||0));
+    ctx.closePath();
+    ctx.fillStyle=col+'18';ctx.fill();
+    // std band (slightly opaque)
+    ctx.beginPath();
+    for(let ti=0;ti<T;ti++){
+      const m=(meanArr[ti]||[])[si]||0,s=(stdArr[ti]||[])[si]||0;
+      ctx.lineTo(tx(tArr[ti]),ty(m+s));
+    }
+    for(let ti=T-1;ti>=0;ti--){
+      const m=(meanArr[ti]||[])[si]||0,s=(stdArr[ti]||[])[si]||0;
+      ctx.lineTo(tx(tArr[ti]),ty(m-s));
+    }
+    ctx.closePath();
+    ctx.fillStyle=col+'30';ctx.fill();
+    // Mean line
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.shadowColor=col;ctx.shadowBlur=4;
+    ctx.beginPath();
+    tArr.forEach((t,ti)=>{
+      const y=ty((meanArr[ti]||[])[si]||0);
+      ti?ctx.lineTo(tx(t),y):ctx.moveTo(tx(t),y);
+    });
+    ctx.stroke();ctx.shadowBlur=0;
+    // Sample spaghetti (3 faint traces)
+    const spaghetti=sd.sample_trajectories||[];
+    spaghetti.slice(0,3).forEach(traj=>{
+      ctx.strokeStyle=col+'44';ctx.lineWidth=1;
+      ctx.beginPath();
+      tArr.forEach((t,ti)=>{
+        const y=ty((traj[ti]||[])[si]||0);
+        ti?ctx.lineTo(tx(t),y):ctx.moveTo(tx(t),y);
+      });
+      ctx.stroke();
+    });
+    // Label
+    ctx.fillStyle=col;ctx.font='9px Fira Code,monospace';ctx.textAlign='left';
+    const lastY=ty((meanArr[T-1]||[])[si]||0);
+    ctx.fillText(nm,W-P.r+2,Math.max(P.t+8,Math.min(H-P.b,lastY)));
+  });
+  // SSA legend
+  ctx.fillStyle='rgba(208,80,200,.7)';ctx.font='8px Fira Code,monospace';ctx.textAlign='right';
+  ctx.fillText(`SSA · Ω=${sd.omega} · N=${sd.n_trajectories}`,W-P.r,H-2);
+}
+
+/* ════════════════════════════════════════════════ SIM MODE TOGGLE */
+function setSimMode(mode){
+  PLANT.simMode=mode;
+  const isStoch=(mode==='stochastic');
+  document.getElementById('mode-ideal-btn')?.classList.toggle('active-ideal',!isStoch);
+  document.getElementById('mode-stoch-btn')?.classList.toggle('active-stoch',isStoch);
+  // Show/hide param sections
+  const detP=document.getElementById('det-params');
+  const stochP=document.getElementById('stoch-params');
+  if(detP)  detP.style.display=isStoch?'none':'';
+  if(stochP) stochP.classList.toggle('open',isStoch);
+  // SSA badge
+  const badge=document.getElementById('ssa-badge');
+  if(badge) badge.classList.toggle('visible',isStoch);
+  // Update run button label
+  const runBtn=document.getElementById('run-btn');
+  if(runBtn) runBtn.textContent=isStoch?'Run SSA':'Run Simulation';
+}
+
+/* ════════════════════════════════════════════ PLOTLY 3D PDF SURFACE */
+function renderStochasticTab(){
+  const label=UI.stochReactorLabel;
+  if(!label) return;
+  const rr=PLANT.result?.reactor_results?.[label];
+  const sd=rr?.stochastic_data || UI.tlData?.stochastic_data;
+  const container=document.getElementById('r-plotly-container');
+  const infoBar=document.getElementById('pdf-info-bar');
+  if(!container) return;
+
+  if(!sd||!sd.pdf_surfaces){
+    container.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;font-family:var(--mono);font-size:11px;color:#3a5472">Run in Stochastic Reality mode to generate PDF surfaces.</div>';
+    return;
+  }
+
+  // Populate species selector
+  const sel=document.getElementById('pdf-species-sel');
+  if(sel && sel.options.length===0){
+    (sd.species_names||[]).forEach(sp=>{
+      const o=document.createElement('option');o.value=sp;o.textContent=sp;sel.appendChild(o);
+    });
+  }
+  const selSp=sel?.value||(sd.species_names||[])[0];
+  if(!selSp) return;
+
+  const surf=sd.pdf_surfaces[selSp];
+  if(!surf){container.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:#3a5472;padding:20px">No PDF data for species '+selSp+'</div>';return;}
+
+  const time_pts=surf.time||[];
+  const conc_bins=surf.conc_bins||[];
+  const density=surf.density||[];    // [t_idx][bin_idx]
+
+  // Downsample time axis for performance (max 60 points in 3D)
+  const MAX_T=60;
+  const step=Math.max(1,Math.floor(time_pts.length/MAX_T));
+  const t_ds=[],z_ds=[];
+  for(let i=0;i<time_pts.length;i+=step){t_ds.push(time_pts[i]);z_ds.push(density[i]||[]);}
+
+  // Transpose: Plotly surface wants z[y_idx][x_idx] (conc × time)
+  const z_surf=conc_bins.map((_,bi)=>t_ds.map((_,ti)=>z_ds[ti][bi]||0));
+
+  // Mean overlay line
+  const meanArr=sd.mean||[];
+  const spIdx=(sd.species_names||[]).indexOf(selSp);
+  const meanTime=[],meanConc=[];
+  for(let i=0;i<time_pts.length;i+=step){
+    meanTime.push(time_pts[i]);
+    meanConc.push((meanArr[i]||[])[spIdx]||0);
+  }
+
+  const showSpaghetti=document.getElementById('pdf-show-spaghetti')?.checked;
+  const spaghettiTraces=[];
+  if(showSpaghetti&&sd.sample_trajectories){
+    sd.sample_trajectories.slice(0,5).forEach((traj,ti)=>{
+      const tc=[],yc=[];
+      for(let i=0;i<time_pts.length;i+=step){tc.push(time_pts[i]);yc.push((traj[i]||[])[spIdx]||0);}
+      spaghettiTraces.push({
+        type:'scatter3d',mode:'lines',
+        x:tc,y:yc,z:yc.map(()=>0),
+        line:{color:`rgba(208,80,200,${0.3+ti*0.1})`,width:2},
+        name:`Traj ${ti+1}`,showlegend:false,
+      });
+    });
+  }
+
+  const surfaceTrace={
+    type:'surface',
+    x:t_ds, y:conc_bins, z:z_surf,
+    colorscale:[
+      [0,'rgba(13,18,32,0)'],[0.1,'rgba(74,144,245,0.3)'],[0.4,'rgba(24,216,176,0.7)'],
+      [0.7,'rgba(240,160,48,0.9)'],[1,'rgba(232,64,64,1)']
+    ],
+    opacity:0.88,
+    contours:{z:{show:true,usecolormap:true,highlightcolor:'rgba(240,160,48,.8)',project:{z:true}}},
+    showscale:false,
+    name:'P(C,t)',
+  };
+
+  const meanTrace={
+    type:'scatter3d',mode:'lines',
+    x:meanTime,y:meanConc,z:meanConc.map(()=>Math.max(...(z_surf.map(row=>Math.max(...row))))*.05),
+    line:{color:'#f0a030',width:4},name:'Mean',showlegend:false,
+  };
+
+  // Container height: fill available space
+  const wrap=document.getElementById('r-plotly-wrap');
+  const H=Math.max(260,(wrap?.clientHeight||400)-60);
+  container.style.height=H+'px';
+
+  const layout={
+    paper_bgcolor:'#07080e',plot_bgcolor:'#07080e',
+    scene:{
+      xaxis:{title:'Time (s)',color:'#3a5472',gridcolor:'#1c2d47',showbackground:false},
+      yaxis:{title:`[${selSp}] (M)`,color:'#3a5472',gridcolor:'#1c2d47',showbackground:false},
+      zaxis:{title:'P(C,t)',color:'#3a5472',gridcolor:'#1c2d47',showbackground:false},
+      camera:{eye:{x:1.5,y:-1.6,z:1.1}},
+      aspectmode:'manual',aspectratio:{x:2,y:1.2,z:0.9},
+    },
+    margin:{l:0,r:0,t:0,b:0},
+    font:{family:"'Fira Code',monospace",size:10,color:'#3a5472'},
+  };
+
+  const config={
+    displayModeBar:true,
+    modeBarButtonsToRemove:['toImage','sendDataToCloud'],
+    displaylogo:false,
+    responsive:true,
+  };
+
+  // Purge previous if any to avoid memory leak
+  if(container._plotlyAttached){
+    try{Plotly.purge(container);}catch(e){}
+  }
+  Plotly.newPlot(container,[surfaceTrace,meanTrace,...spaghettiTraces],layout,config)
+    .then(()=>{container._plotlyAttached=true;});
+
+  if(infoBar){
+    const omega=sd.omega||'?';const ntraj=sd.n_trajectories||'?';
+    infoBar.textContent=`Species: ${selSp} · Ω=${omega} · ${ntraj} trajectories · `
+      +`${conc_bins.length} concentration bins · ${t_ds.length} time points`;
+  }
+  if(document.getElementById('pdf-traj-info')){
+    document.getElementById('pdf-traj-info').textContent=`${ntraj||'?'} traj · Ω=${omega||'?'}`;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════ T CANVAS */
@@ -2253,7 +2710,6 @@ function applyNodeConfig(){
 
 /* ══════════════════════════════════════════════════════════════ OPTIMIZER */
 function openOptimizer(){
-  return; // NOTE TO REMOVE ONCE OPTIMIZER COMPLETED
   if(!UI.optDVars.length){
     PLANT.nodes.filter(n=>n.type==='cstr').forEach(n=>{
       UI.optDVars.push({name:'V_'+n.label,variable_type:'reactor_volume',target:n.label,lower:50,upper:2000});
@@ -2746,13 +3202,23 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{
 function switchTab(prefix,name){
   document.querySelectorAll(`[id^="${prefix}-tab-"]`).forEach(t=>{
     t.classList.toggle('active',t.id===`${prefix}-tab-${name}`);
+    // pdf tab uses display:none instead of class (Plotly needs it visible to size correctly)
+    if(t.id===`${prefix}-tab-pdf`){
+      t.style.display=(name==='pdf')?'flex':'none';
+    }
   });
   const tabs=document.querySelectorAll('.tabs .tab');
-  const tabNames=['info','feeds','species','reactions','outlet','pareto','convergence','results'];
   tabs.forEach(t=>{
-    const n=t.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1];
+    const n=t.getAttribute('onclick')?.match(/'([^']+)'\)(?:;.*)?$/)?.[1];
     if(n)t.classList.toggle('active',n===name);
   });
+  // Trigger Plotly resize when PDF tab becomes visible
+  if(name==='pdf'){
+    const c=document.getElementById('r-plotly-container');
+    if(c&&c._plotlyAttached){
+      setTimeout(()=>{try{Plotly.Plots.resize(c);}catch(e){}},50);
+    }
+  }
 }
 
 function toggleAddForm(id){
@@ -2795,9 +3261,9 @@ const origOpenModal=openModal;
 window.openModal=function(id){origOpenModal(id);if(id==='help-modal')loadHelp();};
 
 /* ════════════════════════════════════════════════════════════════ OPTIMIZER BTN */
-// Add optimizer button to header action area
+// Optimizer button in header now switches to the Optimizer tab
 document.querySelector('.hdr').insertAdjacentHTML('beforeend',
-  `<button class="btn sm" onclick="openOptimizer()" style="order:-1">Optimizer</button>`);
+  `<button class="btn sm" onclick="switchMainTab('opt')" style="order:-1">Optimizer</button>`);
 
 /* ════════════════════════════════════════════════════════════ KEYBOARD */
 document.addEventListener('keydown',e=>{
@@ -2810,13 +3276,318 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Delete'&&UI.selected)deleteSelected();
 });
 
+/* ═══════════════════════════════════════════════════════════ MAIN TABS */
+function switchMainTab(name){
+  ['cc','dash','opt'].forEach(t=>{
+    document.getElementById(`screen-${t}`).style.display = t===name ? (t==='cc'?'flex':'block') : 'none';
+    const btn = document.getElementById(`mtab-${t}`);
+    if(btn) btn.classList.toggle('active', t===name);
+  });
+  if(name==='dash') refreshDashboard();
+  if(name==='opt'){
+    // Pass current plant state into the optimizer iframe via postMessage
+    const iframe = document.getElementById('opt-iframe');
+    if(iframe?.contentWindow){
+      const state={
+        nodes: PLANT.nodes.map(n=>({label:n.label,type:n.type,config:n.config})),
+        result: PLANT.result,
+        plant_name: document.getElementById('p-name')?.value||'Plant',
+      };
+      try{ sessionStorage.setItem('nl_optimizer_state', JSON.stringify(state)); }catch(e){}
+      iframe.contentWindow.postMessage({type:'nl_state', state}, '*');
+    }
+  }
+}
+// Legacy stub so any remaining references don't crash
+function openOptimizerTab(){ switchMainTab('opt'); }
+
+/* ═══════════════════════════════════════════════════════════ DASHBOARD */
+const DASH_SLOT_TYPES = [
+  {id:'none',        label:'— Empty —'},
+  {id:'conc',        label:'Concentration trajectory'},
+  {id:'material_bal',label:'Material balance'},
+  {id:'sink_flow',   label:'Sink material flow'},
+  {id:'conv_heat',   label:'Conversion heatmap'},
+  {id:'pressure',    label:'Pressure sweep (pipe)'},
+  {id:'pump_power',  label:'Pump power'},
+];
+
+// 6 configurable slots; each has a type and optional target (reactor/pipe name)
+let DASH_SLOTS = [
+  {type:'conc',         target:''},
+  {type:'sink_flow',    target:''},
+  {type:'material_bal', target:''},
+  {type:'none',         target:''},
+  {type:'none',         target:''},
+  {type:'none',         target:''},
+];
+
+function initDashboard(){
+  const grid = document.getElementById('dash-grid');
+  if(!grid) return;
+  grid.innerHTML = DASH_SLOTS.map((_,i) => `
+    <div class="dash-slot" id="dash-slot-${i}">
+      <div class="dash-slot-hdr">
+        <span class="dash-slot-title" id="dash-title-${i}">Slot ${i+1}</span>
+        <select class="fi" style="width:auto;font-size:9px;height:22px;padding:0 4px"
+          onchange="setDashSlotType(${i},this.value)">
+          ${DASH_SLOT_TYPES.map(t=>`<option value="${t.id}"${DASH_SLOTS[i].type===t.id?' selected':''}>${t.label}</option>`).join('')}
+        </select>
+        <select class="fi" id="dash-target-${i}" style="width:90px;font-size:9px;height:22px;padding:0 4px;display:${DASH_SLOTS[i].type==='conc'||DASH_SLOTS[i].type==='pressure'?'':'none'}"
+          onchange="DASH_SLOTS[${i}].target=this.value">
+        </select>
+        <button class="btn sm icon" onclick="refreshDashSlot(${i})" title="Refresh">↻</button>
+      </div>
+      <div class="dash-slot-body" id="dash-body-${i}">
+        <span style="color:var(--text-dim);font-family:var(--mono);font-size:11px">Run simulation to populate</span>
+      </div>
+    </div>`).join('');
+  updateDashTargetSelects();
+}
+
+function setDashSlotType(i, type){
+  DASH_SLOTS[i].type = type;
+  DASH_SLOTS[i].target = '';
+  const targetSel = document.getElementById(`dash-target-${i}`);
+  if(targetSel) targetSel.style.display = (type==='conc'||type==='pressure') ? '' : 'none';
+  updateDashTargetSelects();
+  refreshDashSlot(i);
+}
+
+function updateDashTargetSelects(){
+  const cstrLabels = PLANT.nodes.filter(n=>n.type==='cstr').map(n=>n.label);
+  const pipeLabels = PLANT.edges.map(e=>{
+    const s=PLANT.nodes.find(n=>n.id===e.src);
+    const t=PLANT.nodes.find(n=>n.id===e.tgt);
+    return s&&t ? `${s.label}→${t.label}` : null;
+  }).filter(Boolean);
+
+  DASH_SLOTS.forEach((slot,i)=>{
+    const sel = document.getElementById(`dash-target-${i}`);
+    if(!sel) return;
+    const opts = slot.type==='conc' ? cstrLabels : slot.type==='pressure' ? pipeLabels : [];
+    sel.innerHTML = opts.map(l=>`<option value="${l}"${slot.target===l?' selected':''}>${l}</option>`).join('');
+    if(!slot.target && opts.length) DASH_SLOTS[i].target = opts[0];
+  });
+}
+
+async function refreshDashSlot(i){
+  const slot = DASH_SLOTS[i];
+  const body = document.getElementById(`dash-body-${i}`);
+  const title = document.getElementById(`dash-title-${i}`);
+  if(!body) return;
+
+  body.innerHTML = '<span style="color:var(--text-dim);font-family:var(--mono);font-size:10px">Loading…</span>';
+
+  if(slot.type==='none'){
+    body.innerHTML = '<span style="color:var(--text-dim);font-family:var(--mono);font-size:10px">— Empty slot —</span>';
+    if(title) title.textContent = 'Empty';
+    return;
+  }
+
+  if(!PLANT.result){
+    body.innerHTML = '<span style="color:var(--text-dim);font-family:var(--mono);font-size:10px">Run simulation first</span>';
+    return;
+  }
+
+  try{
+    if(slot.type==='conc'){
+      const name = slot.target || (PLANT.nodes.find(n=>n.type==='cstr')?.label||'');
+      if(!name){ body.innerHTML='<span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">No reactor selected</span>'; return; }
+      const r = await api('GET', `/api/reactor_plot/${encodeURIComponent(name)}`);
+      if(r.status==='ok' && r.data.trajectory){
+        body.innerHTML = `<img src="${r.data.trajectory}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+        if(title) title.textContent = `Conc — ${name}`;
+      }
+    } else if(slot.type==='material_bal'){
+      const r = await api('GET', '/api/plots');
+      if(r.status==='ok' && r.data.material_balance){
+        body.innerHTML = `<img src="${r.data.material_balance}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+        if(title) title.textContent = 'Material Balance';
+      }
+    } else if(slot.type==='sink_flow'){
+      const r = await api('GET', '/api/sink_flow');
+      if(r.status==='ok'){
+        const sinks = r.data.sinks || {};
+        const names = Object.keys(sinks);
+        if(!names.length){ body.innerHTML='<span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">No sinks</span>'; return; }
+        // Draw all sinks as canvas charts
+        body.innerHTML = names.map(sn=>`<canvas id="sc-${i}-${sn.replace(/[^a-z0-9]/gi,'_')}" style="max-width:100%;height:100%"></canvas>`).join('');
+        names.forEach(sn=>{
+          const sd = sinks[sn];
+          if(!sd.time || !sd.series) return;
+          drawSinkFlowCanvas(`sc-${i}-${sn.replace(/[^a-z0-9]/gi,'_')}`, sn, sd);
+        });
+        if(title) title.textContent = `Sink Flow — ${names.join(', ')}`;
+      }
+    } else if(slot.type==='conv_heat'){
+      const r = await api('GET', '/api/plots');
+      if(r.status==='ok' && r.data.conversion_heatmap){
+        body.innerHTML = `<img src="${r.data.conversion_heatmap}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+        if(title) title.textContent = 'Conversion Heatmap';
+      }
+    } else if(slot.type==='pressure'){
+      const name = slot.target || '';
+      if(!name){ body.innerHTML='<span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">No pipe selected</span>'; return; }
+      const r = await api('GET', `/api/pipe_plot/${encodeURIComponent(name)}`);
+      if(r.status==='ok' && r.data.sweep_plot){
+        body.innerHTML = `<img src="${r.data.sweep_plot}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+        if(title) title.textContent = `Pressure — ${name}`;
+      }
+    } else if(slot.type==='pump_power'){
+      const t_end = parseFloat(document.getElementById('p-tend')?.value)||300;
+      const r = await api('GET', `/api/pump_power_plot?t_end=${t_end}`);
+      if(r.status==='ok' && r.data.plot){
+        body.innerHTML = `<img src="${r.data.plot}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+        if(title) title.textContent = 'Pump Power';
+      } else {
+        body.innerHTML = `<span style="color:var(--text-dim);font-size:10px;font-family:var(--mono)">${r.message||'No pump data'}</span>`;
+      }
+    }
+  } catch(e){
+    body.innerHTML = `<span style="color:var(--red);font-size:10px;font-family:var(--mono)">Error: ${esc(String(e))}</span>`;
+  }
+}
+
+function drawSinkFlowCanvas(canvasId, sinkName, data){
+  const can = document.getElementById(canvasId);
+  if(!can) return;
+  const W = can.parentElement.clientWidth || 300;
+  const H = can.parentElement.clientHeight || 200;
+  can.width = W; can.height = H;
+  const ctx = can.getContext('2d');
+  ctx.fillStyle = '#07080e'; ctx.fillRect(0,0,W,H);
+
+  const t = data.time;
+  const series = data.series;
+  const spNames = Object.keys(series);
+  if(!spNames.length || !t.length) return;
+
+  const Pd = {l:48,r:12,t:18,b:28};
+  const pw = W-Pd.l-Pd.r, ph = H-Pd.t-Pd.b;
+
+  // Y scale: max across all species
+  let yMax = 0;
+  spNames.forEach(sp=>{ const m=Math.max(...series[sp]); if(m>yMax) yMax=m; });
+  yMax = yMax * 1.05 || 0.001;
+  const tMin=t[0], tMax=t[t.length-1], tR=tMax-tMin||1;
+
+  const tx = tv => Pd.l + (tv-tMin)/tR*pw;
+  const ty = v  => Pd.t + ph - (v/yMax)*ph;
+
+  // Grid
+  ctx.setLineDash([2,4]); ctx.strokeStyle='#182a40'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=Pd.t+(i/4)*ph;
+    ctx.beginPath(); ctx.moveTo(Pd.l,y); ctx.lineTo(W-Pd.r,y); ctx.stroke();
+    ctx.fillStyle='#3a5472'; ctx.font='8px Fira Code,monospace'; ctx.textAlign='right';
+    ctx.fillText((yMax*(1-i/4)).toExponential(1), Pd.l-3, y+3);
+  }
+  ctx.setLineDash([]);
+
+  // Series
+  spNames.forEach((sp,si)=>{
+    const col = COLORS[si%COLORS.length];
+    const vals = series[sp];
+    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.shadowColor=col; ctx.shadowBlur=3;
+    ctx.beginPath();
+    t.forEach((tv,ti)=>{ ti?ctx.lineTo(tx(tv),ty(vals[ti])):ctx.moveTo(tx(tv),ty(vals[ti])); });
+    ctx.stroke(); ctx.shadowBlur=0;
+    // Label at end
+    ctx.fillStyle=col; ctx.font='9px Fira Code,monospace'; ctx.textAlign='left';
+    ctx.fillText(sp, W-Pd.r+2, ty(vals[vals.length-1]));
+  });
+
+  // Axes labels
+  ctx.fillStyle='#3a5472'; ctx.font='9px Barlow,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Time (s)', Pd.l+pw/2, H-2);
+  ctx.save(); ctx.translate(10, Pd.t+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('mol/s', 0, 0); ctx.restore();
+
+  // Title
+  ctx.fillStyle='#cce0f8'; ctx.font='9px Fira Code,monospace'; ctx.textAlign='left';
+  ctx.fillText(`Sink: ${sinkName}`, Pd.l+2, Pd.t-4);
+}
+
+async function refreshDashboard(){
+  updateDashTargetSelects();
+  for(let i=0;i<DASH_SLOTS.length;i++) await refreshDashSlot(i);
+}
+
+/* ═══════════════════════════════════════════════ STEADY STATE SEEKING */
+async function seekSteadyState(){
+  if(!PLANT.nodes.some(n=>n.type==='cstr')){ toast('Add CSTR reactors first.'); return; }
+
+  const tol = parseFloat(document.getElementById('ss-tol')?.value||1) / 100;
+  const n_segs = Math.min(parseInt(document.getElementById('p-segs')?.value||8), 15);
+  const t_start = parseFloat(document.getElementById('p-tend')?.value||200);
+
+  setStatus('run','Seeking steady state...');
+  document.getElementById('run-btn').disabled = true;
+
+  const ssEl = document.getElementById('ss-result');
+  if(ssEl){ ssEl.style.display=''; ssEl.style.background='var(--surface2)'; ssEl.style.color='var(--text-dim)'; ssEl.textContent='Seeking…'; }
+
+  // First sync plant state
+  const pname = document.getElementById('p-name')?.value||'Plant';
+  const edgesWL = PLANT.edges.map(e=>{
+    const src=PLANT.nodes.find(n=>n.id===e.src), tgt=PLANT.nodes.find(n=>n.id===e.tgt);
+    const cfg={...e.config}; if(!cfg.pump_efficiency)cfg.pump_efficiency=0.75; delete cfg.inlet_pressure_Pa;
+    return{...e,config:cfg,src_label:src?.label||'',tgt_label:tgt?.label||''};
+  });
+  const nodesWP = PLANT.nodes.map(n=>({...n,config:{...n.config,pressure_kPa:n.config?.pressure_kPa||101.325,pressure_mode:n.config?.pressure_mode||'atm'}}));
+  await api('POST','/api/sync_plant',{name:pname,nodes:nodesWP,edges:edgesWL});
+
+  const r = await api('POST','/api/seek_steady_state',{
+    t_start, t_max: t_start * 32, tol, n_segments: n_segs
+  });
+
+  document.getElementById('run-btn').disabled = false;
+
+  if(r.status==='ok'){
+    PLANT.result = r.data;
+    const kw=(r.data.total_pump_kW||0).toFixed(3);
+    document.getElementById('energy-draw').textContent = kw+' kW';
+
+    const conv = r.data.steady_state_converged;
+    const ss_t = r.data.steady_state_time;
+    const iters= r.data.iterations;
+    const t_sim= r.data.t_simulated;
+
+    if(conv){
+      setStatus('ok',`Steady state found at t≈${ss_t?.toFixed(0)||t_sim?.toFixed(0)}s`);
+      toast(`✓ Steady state converged in ${iters} iteration(s) at t≈${ss_t?.toFixed(0)||t_sim?.toFixed(0)}s`,5000);
+      if(ssEl){ ssEl.style.background='rgba(64,200,120,.12)'; ssEl.style.color='var(--green)'; ssEl.textContent=`SS @ t≈${ss_t?.toFixed(0)||t_sim?.toFixed(0)}s (${iters} iter, tol=${(tol*100).toFixed(1)}%)`; }
+      // Update t_end to the converged value so next manual sim uses it
+      const tendEl = document.getElementById('p-tend');
+      if(tendEl) tendEl.value = Math.ceil(t_sim||t_start);
+    } else {
+      setStatus('err',`SS not reached by t=${t_sim?.toFixed(0)}s`);
+      toast(`⚠ Steady state not reached by t=${t_sim?.toFixed(0)}s. Try higher t_max or different conditions.`,6000);
+      if(ssEl){ ssEl.style.background='rgba(240,160,48,.1)'; ssEl.style.color='var(--amber)'; ssEl.textContent=`Not converged at t=${t_sim?.toFixed(0)}s — increase t_end or t_max`; }
+    }
+
+    const dry=r.data.run_dry_reactors||[], overflow=r.data.overflow_reactors||[];
+    document.getElementById('run-dry-badge').style.display=dry.length?'':'none';
+    if(dry.length) toast('⚠ Run-dry: '+dry.join(', '),4000);
+    if(overflow.length) toast('⚠ Overflow: '+overflow.join(', '),4000);
+
+    renderWorkspace(); renderContextPanel();
+  } else {
+    setStatus('err','Steady state seek failed');
+    toast('Seek steady state failed: '+(r.message||''));
+    if(ssEl){ ssEl.style.color='var(--red)'; ssEl.textContent='Failed: '+(r.message||''); }
+  }
+}
+
 /* ════════════════════════════════════════════════════════ INIT */
 (async()=>{
   loadSpProps().catch(()=>{});
+  initDashboard();
   const r=await api('GET','/api/status');
   if(r.status==='ok'){
     const d=r.data;
-    setStatus('ok',`v${d.version||'2.0'} — ChemSim:${d.chemsim?'ok':'missing'} TS:${d.transportsim?'ok':'missing'}`);
+    setStatus('ok',`v${d.version||'2.1'} — ChemSim:${d.chemsim?'ok':'missing'} TS:${d.transportsim?'ok':'missing'}`);
   }else{
     setStatus('err','API offline — is Flask running?');
   }

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import sys
 import os
 import traceback
@@ -26,6 +27,34 @@ from typing import Optional
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+
+# ── Logger ────────────────────────────────────────────────────────────────────
+def _setup_logger() -> logging.Logger:
+    log = logging.getLogger("networklite")
+    if log.handlers:
+        return log  # already configured
+    log.setLevel(logging.DEBUG)
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    # Console
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(fmt)
+    log.addHandler(ch)
+    # File
+    try:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "networklite.log")
+        fh = logging.FileHandler(log_path, encoding="utf-8")
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(fmt)
+        log.addHandler(fh)
+    except Exception:
+        pass
+    return log
+
+logger = _setup_logger()
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 _dash_dir = os.path.dirname(os.path.abspath(__file__))
@@ -106,6 +135,10 @@ def _err(msg: str, code: int = 400):
 def index():
     # index.html lives alongside app.py in the dashboard/ directory
     return send_from_directory(_dash_dir, "index.html")
+
+@app.route("/optimizer")
+def optimizer_page():
+    return send_from_directory(_dash_dir, "optimizer.html")
 
 
 @app.route("/api/status")
@@ -434,20 +467,65 @@ def simulate():
     global _last_result
     data       = request.get_json() or {}
     t_end      = float(data.get("t_end",       300.0))
-    n_segments = int(data.get("n_segments",    15))
+    # Cap segments: too many causes solver overflow on stiff systems
+    n_segments = min(int(data.get("n_segments", 10)), 30)
+
+    # ── V3.0 stochastic parameters ─────────────────────────────────────────
+    mode = data.get("mode", "deterministic")
+    stochastic_params = None
+    if mode == "stochastic":
+        stochastic_params = {
+            "n_trajectories": int(data.get("n_trajectories", 30)),
+            "omega"         : int(data.get("omega", 300)),
+            "n_samples"     : int(data.get("n_samples", 80)),
+            "tau_eps"       : float(data.get("tau_eps", 0.03)),
+            "seed"          : data.get("seed", None),
+        }
 
     plant = _get_plant()
     if not plant.reactors:
         return _err("Plant has no nodes. Add reactors or sources first.")
+    logger.info(
+        f"simulate: mode={mode} t_end={t_end}s segments={n_segments} "
+        f"nodes={len(plant.reactors)} connections={len(plant.connections)}"
+        + (f" n_traj={stochastic_params['n_trajectories']} Ω={stochastic_params['omega']}"
+           if stochastic_params else "")
+    )
     try:
-        result       = plant.simulate(t_end=t_end, n_segments=n_segments)
+        result = plant.simulate(
+            t_end=t_end, n_segments=n_segments,
+            mode=mode, stochastic_params=stochastic_params,
+        )
         _last_result = result
+        logger.info(f"simulate OK: converged={result.network_converged} "
+                    f"run_dry={result.run_dry_reactors} pump_kW={result.total_pump_kW:.3f}")
         return _ok(result.to_dict())
     except Exception as e:
+        logger.error(f"simulate FAILED: {e}\n{traceback.format_exc()}")
         return _err(f"Simulation failed: {e}\n{traceback.format_exc()}")
 
 
-# ── Plots ─────────────────────────────────────────────────────────────────────
+@app.route("/api/stochastic_status")
+def stochastic_status():
+    """
+    Returns whether Gillespie SSA is available in the current environment,
+    and per-reactor simulation_mode from the last result.
+    """
+    try:
+        from gillespie import GillespieSimulator
+        ssa_available = True
+    except ImportError:
+        ssa_available = False
+
+    per_reactor = {}
+    if _last_result:
+        for rname, rr in _last_result.reactor_results.items():
+            per_reactor[rname] = getattr(rr, "simulation_mode", "deterministic")
+
+    return _ok({
+        "ssa_available" : ssa_available,
+        "per_reactor"   : per_reactor,
+    })
 
 @app.route("/api/plots")
 def plots():
@@ -522,6 +600,9 @@ def reactor_plot(n):
             "conc_table" : conc_table,   # per-timestep dict for numeric display
             "species"    : names,
             "temp"       : temp,
+            # ── V3.0 stochastic fields ───────────────────────────────────────
+            "simulation_mode"  : getattr(rr, "simulation_mode", "deterministic"),
+            "stochastic_data"  : getattr(rr, "stochastic_data", None),
         })
     except Exception as e:
         return _err(str(e))
@@ -951,11 +1032,19 @@ def sync_plant():
                         sp_added.add(sp_name)
 
         if not sp_added:
-            rn.add_species("A", initial=2.0)
-            rn.add_species("B", initial=0.0)
-            sp_added = {"A", "B"}
+            # Only add A/B placeholder if user has defined NO species at all
+            # (not just if the parse above found nothing — that could be a format issue)
+            raw_sp_cfg = cfg.get("species", [])
+            has_user_species = bool(raw_sp_cfg) if isinstance(raw_sp_cfg, list) else bool(raw_sp_cfg)
+            if not has_user_species:
+                logger.warning(f"[{label}] No species defined — using A/B placeholder")
+                rn.add_species("A", initial=2.0)
+                rn.add_species("B", initial=0.0)
+                sp_added = {"A", "B"}
+            else:
+                logger.warning(f"[{label}] Species list non-empty but none parsed — check format")
 
-        # Reactions
+        # Reactions — pass stoichiometry so coefficients are respected
         for rxn in cfg.get("reactions", []):
             reactants_raw = rxn.get("reactants", "")
             products_raw  = rxn.get("products",  "")
@@ -967,23 +1056,44 @@ def sync_plant():
             reactants = [r for r in reactants if r in all_sp]
             products  = [p for p in products  if p in all_sp]
             if not reactants and not products:
+                logger.warning(f"[{label}] Skipping reaction — no valid species: {rxn}")
                 continue
+            # Parse stoichiometry (may be stored as list or default to 1)
+            r_stoich = rxn.get("reactant_stoich") or rxn.get("stoich_r")
+            p_stoich = rxn.get("product_stoich")  or rxn.get("stoich_p")
+            if r_stoich and isinstance(r_stoich, (list, tuple)):
+                r_stoich = [float(x) for x in r_stoich[:len(reactants)]]
+            else:
+                r_stoich = None
+            if p_stoich and isinstance(p_stoich, (list, tuple)):
+                p_stoich = [float(x) for x in p_stoich[:len(products)]]
+            else:
+                p_stoich = None
             try:
-                rn.add_reaction(
-                    reactants or [rn.species_names[0]],
-                    products  or [rn.species_names[-1]],
+                kwargs = dict(
                     rate=float(rxn.get("rate", 0.05)),
                     activation_energy=float(rxn.get("activation_energy", 0.0)),
                     pre_exponential=float(rxn.get("pre_exponential", 0.0)),
                 )
-            except Exception:
-                pass
+                if r_stoich:
+                    kwargs["reactant_stoich"] = r_stoich
+                if p_stoich:
+                    kwargs["product_stoich"] = p_stoich
+                rn.add_reaction(
+                    reactants or [rn.species_names[0]],
+                    products  or [rn.species_names[-1]],
+                    **kwargs,
+                )
+                logger.debug(f"[{label}] Added reaction: {reactants}→{products} k={kwargs['rate']}")
+            except Exception as exc:
+                logger.error(f"[{label}] Reaction add failed: {exc} | rxn={rxn}")
 
         if not rn.reactions:
             sp_list = rn.species_names
             if len(sp_list) >= 2:
                 try:
                     rn.add_reaction([sp_list[0]], [sp_list[1]], rate=0.05)
+                    logger.info(f"[{label}] Auto-added default reaction {sp_list[0]}→{sp_list[1]}")
                 except Exception:
                     pass
 
@@ -1506,36 +1616,250 @@ def auto_balance():
         result = plant.simulate(t_end=t_end, n_segments=n_segments)
         _last_result = result
     except Exception as e:
+        logger.error(f"auto_balance final simulate failed: {e}")
         return _err(f"Final simulation failed: {e}")
 
+    logger.info(f"auto_balance done: {len(balance_log)} actions, "
+                f"still_dry={result.run_dry_reactors}, overflow={result.overflow_reactors}")
     resp = result.to_dict()
-    resp["balance_log"]   = balance_log
-    resp["iterations"]    = iteration + 1
-    resp["still_dry"]     = result.run_dry_reactors
-    resp["converged"]     = len(result.run_dry_reactors) == 0
+    resp["balance_log"]    = balance_log
+    resp["iterations"]     = iteration + 1
+    resp["still_dry"]      = result.run_dry_reactors
+    resp["overflow"]       = result.overflow_reactors
+    resp["converged"]      = len(result.run_dry_reactors) == 0
     return _ok(resp)
 
 
+@app.route("/api/species_properties", methods=["GET"])
+def get_species_properties():
     return _ok(_get_plant().species_properties)
-
 
 @app.route("/api/species_properties", methods=["POST"])
 def set_species_properties():
+    """
+    Store per-species physical properties (density, molar mass, viscosity).
+    Then propagate mixture-weighted fluid density to all pipeline connections.
+
+    Body: { "A": { "density_kg_m3": 900, "molar_mass_g_mol": 78, "viscosity_mPas": 0.6 } }
+    """
     plant = _get_plant()
     data  = request.get_json() or {}
+
     for sp, props in data.items():
         plant.species_properties.setdefault(sp, {}).update(props)
-    densities = [v["density_kg_m3"] for v in plant.species_properties.values()
-                 if "density_kg_m3" in v]
-    avg_density = sum(densities) / len(densities) if densities else None
-    if avg_density:
-        for conn in plant.connections.values():
-            conn.pipeline.fluid.density = avg_density
-            conn.pipeline.fluid.density_user_set = True
-    return _ok(plant.species_properties)
+        logger.info(f"species_properties: {sp} = {props}")
+
+    # Compute mixture-weighted density for each connection using feed compositions
+    # For each connection, use the source node's outlet composition to weight densities
+    for conn in plant.connections.values():
+        src_node = plant.reactors.get(conn.source)
+        if src_node is None:
+            continue
+
+        # Get outlet composition at this connection's source
+        outlet = getattr(src_node, "outlet_composition", {})
+        if not outlet and hasattr(src_node, "species"):
+            outlet = getattr(src_node, "species", {})
+
+        if outlet and plant.species_properties:
+            total_c = sum(outlet.values()) or 1.0
+            rho_mix = 0.0
+            for sp, c in outlet.items():
+                props = plant.species_properties.get(sp, {})
+                rho   = props.get("density_kg_m3", 1000.0)
+                rho_mix += (c / total_c) * rho
+            if rho_mix > 0:
+                conn.pipeline.fluid.density = rho_mix
+                conn.pipeline.fluid.density_user_set = True
+                logger.debug(f"  [{conn.name}] mixture density = {rho_mix:.1f} kg/m³")
+        else:
+            # Fallback: simple average of all defined species densities
+            densities = [v["density_kg_m3"] for v in plant.species_properties.values()
+                         if "density_kg_m3" in v]
+            if densities:
+                avg = sum(densities) / len(densities)
+                conn.pipeline.fluid.density = avg
+                conn.pipeline.fluid.density_user_set = True
+
+        # Viscosity: use average if defined
+        viscosities = [v.get("viscosity_mPas", 0) * 1e-3
+                       for v in plant.species_properties.values()
+                       if "viscosity_mPas" in v and v["viscosity_mPas"] > 0]
+        if viscosities:
+            conn.pipeline.fluid.viscosity = sum(viscosities) / len(viscosities)
+
+    return _ok({
+        "species_properties": plant.species_properties,
+        "connections_updated": list(plant.connections.keys()),
+    })
 
 
-@app.route("/api/project")
+# ── Steady-state seeking ──────────────────────────────────────────────────────
+
+@app.route("/api/seek_steady_state", methods=["POST"])
+def seek_steady_state():
+    """
+    Iteratively extend simulation time until concentrations converge.
+
+    Convergence criterion: for each species in each CSTR, the coefficient
+    of variation (std/mean) of the last 20% of the trajectory is < tol.
+
+    Body: { t_start: float, t_max: float, tol: float, n_segments: int }
+    Returns the final SimulationResult plus convergence metadata.
+    """
+    global _last_result
+    data       = request.get_json() or {}
+    t_start    = float(data.get("t_start",    200.0))
+    t_max      = float(data.get("t_max",     5000.0))
+    tol        = float(data.get("tol",         0.01))   # 1% CoV threshold
+    n_segments = min(int(data.get("n_segments", 8)), 20)
+    max_iters  = 6
+
+    import numpy as np
+    plant = _get_plant()
+    if not plant.reactors:
+        return _err("No reactors defined.")
+
+    t_end     = t_start
+    converged = False
+    ss_time   = None
+    iterations= 0
+    result    = None
+
+    for iteration in range(max_iters):
+        iterations += 1
+        t_end = min(t_end, t_max)
+        logger.info(f"seek_steady_state iter {iteration+1}: t_end={t_end:.0f}s")
+
+        try:
+            result = plant.simulate(t_end=t_end, n_segments=n_segments)
+        except Exception as e:
+            logger.error(f"seek_steady_state sim failed: {e}")
+            return _err(f"Simulation failed: {e}")
+
+        _last_result = result
+
+        # Check convergence: CoV of last 20% of each species trajectory
+        all_converged = True
+        cov_report    = {}
+        for rname, rr in result.reactor_results.items():
+            if not hasattr(rr, "concentrations") or rr.concentrations is None:
+                continue
+            n_pts = len(rr.time)
+            tail  = max(int(n_pts * 0.20), 5)
+            tail_conc = rr.concentrations[-tail:, :]
+            for j, sp in enumerate(rr.species_names):
+                col  = tail_conc[:, j]
+                mean = float(np.mean(col))
+                std  = float(np.std(col))
+                cov  = std / mean if mean > 1e-9 else std
+                cov_report[f"{rname}/{sp}"] = round(cov, 6)
+                if cov > tol:
+                    all_converged = False
+
+        if all_converged:
+            converged = True
+            # Find approximate t where last species passed threshold
+            ss_time = float(result.reactor_results[
+                list(result.reactor_results.keys())[0]
+            ].time[-1]) if result.reactor_results else t_end
+            logger.info(f"seek_steady_state converged at t={t_end:.0f}s")
+            break
+
+        if t_end >= t_max:
+            logger.warning(f"seek_steady_state reached t_max={t_max}s without converging")
+            break
+
+        # Extend: 2x each iteration
+        t_end = min(t_end * 2.0, t_max)
+
+    resp = result.to_dict() if result else {}
+    resp["steady_state_converged"] = converged
+    resp["steady_state_time"]      = ss_time
+    resp["iterations"]             = iterations
+    resp["cov_report"]             = cov_report
+    resp["t_simulated"]            = t_end
+    resp["tol"]                    = tol
+    return _ok(resp)
+
+
+# ── Sink material flow time-series ────────────────────────────────────────────
+
+@app.route("/api/sink_flow")
+def sink_flow():
+    """
+    Compute molar flow rate (mol/s per species) arriving at each sink over time.
+
+    For each sink, find upstream CSTR result and compute:
+        molar_flow(t, species) = Q_pipe * C_out(t, species)
+
+    Returns time-series data suitable for plotting.
+    """
+    import numpy as np
+    plant  = _get_plant()
+    result = _last_result
+    if result is None:
+        return _err("No simulation result. Run simulation first.")
+
+    sink_nodes = plant.source_sink_nodes
+    if not sink_nodes:
+        return _ok({"sinks": {}, "message": "No sink nodes in plant."})
+
+    sinks_data = {}
+    for sink_name, sink_node in sink_nodes.items():
+        if sink_node.node_type != "sink":
+            continue
+
+        # Find all connections feeding into this sink
+        inlet_conns = [c for c in plant.connections.values() if c.target == sink_name]
+        if not inlet_conns:
+            sinks_data[sink_name] = {"message": "No inlet connections.", "series": {}}
+            continue
+
+        combined_time   = None
+        combined_flows  = {}   # species → np.ndarray of mol/s
+
+        for conn in inlet_conns:
+            src_name = conn.source
+            pipe_Q   = conn.pipeline.flow_rate_m3s  # m³/s = 1000 L/s
+            pipe_Q_Ls = pipe_Q * 1000.0              # L/s
+
+            rr = result.reactor_results.get(src_name)
+            if rr is None or not hasattr(rr, "concentrations"):
+                continue
+
+            t_arr   = rr.time
+            c_arr   = rr.concentrations   # shape (N, n_species)
+            sp_list = list(rr.species_names)
+
+            if combined_time is None:
+                combined_time = t_arr
+
+            for j, sp in enumerate(sp_list):
+                c_series = c_arr[:, j]    # mol/L
+                # Resample to combined_time if lengths differ
+                if len(c_series) != len(combined_time):
+                    c_series = np.interp(combined_time, t_arr, c_series)
+                flow_series = c_series * pipe_Q_Ls  # mol/s
+
+                if sp not in combined_flows:
+                    combined_flows[sp] = np.zeros_like(combined_time)
+                combined_flows[sp] += flow_series
+
+        if combined_time is None:
+            sinks_data[sink_name] = {"message": "No upstream simulation data.", "series": {}}
+        else:
+            sinks_data[sink_name] = {
+                "time"  : combined_time.tolist(),
+                "series": {sp: arr.tolist() for sp, arr in combined_flows.items()},
+                "units" : "mol/s",
+                "note"  : f"Total molar flow entering {sink_name}",
+            }
+
+    return _ok({"sinks": sinks_data})
+
+
+
 def get_project():
     plant = _get_plant()
     return _ok({

@@ -1,10 +1,3 @@
-from __future__ import annotations
-import sys as _sys, os as _os
-_proj = "/mnt/project"
-_pkg  = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-for _p in [_proj, _pkg]:
-    if _p not in _sys.path: _sys.path.insert(0, _p)
-del _sys, _os, _proj, _pkg
 """
 network/reactor/cstr.py  –  CSTR reactor built on ChemSim
 
@@ -17,6 +10,7 @@ provide steady-state and dynamic simulation with:
   - Heat balance (energy equation with jacket/feed cooling)
 """
 
+from __future__ import annotations
 
 import copy
 import sys, os
@@ -43,6 +37,24 @@ except ImportError:
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 R_GAS = 8.314   # J/(mol·K)
+
+# ── Optional Gillespie SSA ────────────────────────────────────────────────────
+try:
+    import sys as _sys2, os as _os2
+    # Try the directory that contains THIS file first, then /mnt/project as fallback
+    _gillespie_candidates = [
+        _os2.path.dirname(_os2.path.abspath(__file__)),   # same dir as cstr.py
+        _os2.path.dirname(_os2.path.dirname(_os2.path.abspath(__file__))),  # parent
+        "/mnt/project",
+    ]
+    for _gp in _gillespie_candidates:
+        if _gp not in _sys2.path:
+            _sys2.path.insert(0, _gp)
+    from gillespie import GillespieSimulator
+    _HAS_GILLESPIE = True
+except ImportError:
+    _HAS_GILLESPIE = False
+    GillespieSimulator = None
 
 
 # ── Feed stream ───────────────────────────────────────────────────────────────
@@ -181,9 +193,12 @@ class CSTRResult:
     heat_generated_W    : float     = 0.0
     converged           : bool      = True
     issues              : List[str] = field(default_factory=list)
+    # ── V3.0 stochastic fields ─────────────────────────────────────────────────
+    simulation_mode     : str       = "deterministic"  # "deterministic" | "stochastic"
+    stochastic_data     : Optional[dict] = None        # GillespieResult.to_dict()
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "reactor_name"       : self.reactor_name,
             "time"               : self.time.tolist(),
             "concentrations"     : self.concentrations.tolist(),
@@ -195,7 +210,11 @@ class CSTRResult:
             "heat_generated_W"   : self.heat_generated_W,
             "converged"          : self.converged,
             "issues"             : self.issues,
+            "simulation_mode"    : self.simulation_mode,
         }
+        if self.stochastic_data is not None:
+            d["stochastic_data"] = self.stochastic_data
+        return d
 
 
 # ── CSTR class ────────────────────────────────────────────────────────────────
@@ -247,10 +266,6 @@ class CSTR:
 
         self._feeds   : List[FeedStream] = []
         self._result  : Optional[CSTRResult] = None
-
-        # v2: node operating pressure for TransportSim pump auto-balance solver
-        self.pressure_Pa   : float = 101_325.0   # Pa absolute (default = 1 atm)
-        self.pressure_mode : str   = "atm"        # "fixed" | "atm"
 
         # Outlet concentration (updated after simulation)
         self.outlet_composition : Dict[str, float] = {}
@@ -355,26 +370,41 @@ class CSTR:
         t_end       : float = 500.0,
         n_segments  : int   = 20,
         solver_params: Optional[dict] = None,
+        mode        : str   = "deterministic",
+        stochastic_params: Optional[dict] = None,
     ) -> CSTRResult:
         """
         Run CSTR dynamic simulation.
 
-        The CSTR ODE is solved by splitting [0, t_end] into n_segments.
-        In each segment the temperature is held constant (piecewise isothermal),
-        and ChemSim's Simulator is used with dilution modifications.
-
         Parameters
         ----------
         t_end : float
-            Total simulation time in simulation units.
+            Total simulation time.
         n_segments : int
-            Number of temperature segments for gradient handling.
+            Number of temperature segments.
         solver_params : dict, optional
-            Extra parameters passed to ChemSim Simulator.
+            Extra parameters for ChemSim Simulator.
+        mode : str
+            'deterministic' (default ODE solver) or 'stochastic' (Gillespie SSA).
+        stochastic_params : dict, optional
+            SSA-specific parameters: n_trajectories, omega, n_samples, tau_eps, seed.
+        """
+        if mode == "stochastic":
+            return self.simulate_stochastic(
+                t_end=t_end,
+                n_segments=n_segments,
+                **(stochastic_params or {}),
+            )
+        return self._simulate_deterministic(t_end=t_end, n_segments=n_segments, solver_params=solver_params)
 
-        Returns
-        -------
-        CSTRResult
+    def _simulate_deterministic(
+        self,
+        t_end       : float = 500.0,
+        n_segments  : int   = 20,
+        solver_params: Optional[dict] = None,
+    ) -> CSTRResult:
+        """
+        Deterministic ODE simulation (original ChemSim BDF path).
         """
         if not _HAS_CHEMSIM:
             raise RuntimeError("ChemSim is not installed. Cannot run CSTR simulation.")
@@ -521,6 +551,135 @@ class CSTR:
             temperature_profile = T_arr,
             converged           = len(issues) == 0,
             issues              = issues,
+            simulation_mode     = "deterministic",
+        )
+        return self._result
+
+    # ── Stochastic simulation (Gillespie SSA) ─────────────────────────────────
+
+    def simulate_stochastic(
+        self,
+        t_end          : float = 500.0,
+        n_segments     : int   = 10,
+        n_trajectories : int   = 30,
+        omega          : int   = 300,
+        n_samples      : int   = 80,
+        tau_eps        : float = 0.03,
+        seed           : Optional[int] = None,
+    ) -> CSTRResult:
+        """
+        Stochastic CSTR simulation via Gillespie SSA (τ-leaping with exact fallback).
+
+        The deterministic CSTR dilution-correction is replaced by explicit
+        inflow (∅→Xᵢ) and outflow (Xᵢ→∅) pseudo-reactions at rate D = Q/V.
+
+        Parameters
+        ----------
+        t_end          : float   simulation end time
+        n_segments     : int     temperature segments (Arrhenius piecewise)
+        n_trajectories : int     number of independent SSA realisations
+        omega          : int     system-size parameter Ω (noise-speed trade-off)
+        n_samples      : int     evenly-spaced output time points
+        tau_eps        : float   τ-leaping error bound ε (0.01–0.05)
+        seed           : int     RNG seed for reproducibility
+
+        Returns
+        -------
+        CSTRResult with simulation_mode='stochastic' and stochastic_data populated.
+        The `concentrations` field holds the ensemble mean (for backward-compatible
+        2-D canvas rendering); the full PDF is in stochastic_data.
+        """
+        if not _HAS_GILLESPIE:
+            raise RuntimeError(
+                "gillespie.py not found. Ensure it is in the Python path "
+                "(same directory as cstr.py, the project root, or /mnt/project)."
+            )
+
+        τ      = self.residence_time_s
+        issues : List[str] = []
+        if τ == float("inf"):
+            issues.append("No feed streams — residence time is infinite.")
+
+        inlet        = self._mixed_inlet()
+
+        # ── B1 FIX: start from reaction network species, then add any
+        # feed-only species not yet tracked.  Without this, species
+        # that arrive exclusively via _route_outlet_to_feeds (e.g. the
+        # upstream reactor's outlet species) have zero inflow propensity
+        # and are invisible to the Gillespie simulator.
+        species_names = list(self.reaction_network.species_names)
+        for sp in inlet:
+            if sp not in species_names:
+                species_names.append(sp)
+
+        # Build reactions list from ReactionNetwork
+        reactions_raw = []
+        for rxn in self.reaction_network.reactions:
+            reactions_raw.append({
+                "reactants"        : list(rxn.reactants),
+                "products"         : list(rxn.products),
+                "reactant_stoich"  : list(rxn.reactant_stoich),
+                "product_stoich"   : list(rxn.product_stoich),
+                "rate"             : rxn.rate,
+                "activation_energy": rxn.activation_energy,
+                "pre_exponential"  : rxn.pre_exponential,
+            })
+
+        D = (self.total_flow_Ls / self.volume_L) if self.volume_L > 0 else 0.0
+
+        # Initial concentrations: use inlet (CSTR start-up from feed composition)
+        initial_conc = {sp: inlet.get(sp, 0.0) for sp in species_names}
+
+        sim = GillespieSimulator(
+            species_names  = species_names,
+            reactions_raw  = reactions_raw,
+            initial_conc   = initial_conc,
+            inlet_conc     = inlet,
+            dilution_rate  = D,
+            temperature_fn = self.temperature_gradient.temperature_at,
+            omega          = omega,
+        )
+
+        gr = sim.run(
+            t_end          = t_end,
+            n_trajectories = n_trajectories,
+            n_samples      = n_samples,
+            n_segments     = n_segments,
+            tau_eps        = tau_eps,
+            seed           = seed,
+        )
+        issues.extend(gr.issues)
+
+        # Use ensemble mean as the deterministic-compatible trajectory
+        time_arr = gr.time                    # (T,)
+        mean_arr = gr.mean                    # (T, M)
+
+        # Final outlet from mean at last time point
+        outlet: Dict[str, float] = {
+            sp: float(mean_arr[-1, i]) for i, sp in enumerate(species_names)
+        }
+        self.outlet_composition = outlet
+
+        conversion: Dict[str, float] = {}
+        for sp, c_in in inlet.items():
+            if c_in > 0 and sp in outlet:
+                conversion[sp] = max(0.0, (c_in - outlet[sp]) / c_in)
+
+        T_arr = np.array([self.temperature_gradient.temperature_at(t) for t in time_arr])
+
+        self._result = CSTRResult(
+            reactor_name        = self.name,
+            time                = time_arr,
+            concentrations      = mean_arr,          # mean trajectory for 2-D canvas
+            species_names       = species_names,
+            outlet_composition  = outlet,
+            residence_time_s    = τ,
+            conversion          = conversion,
+            temperature_profile = T_arr,
+            converged           = gr.converged,
+            issues              = issues,
+            simulation_mode     = "stochastic",
+            stochastic_data     = gr.to_dict(),
         )
         return self._result
 
@@ -534,22 +693,10 @@ class CSTR:
     def feeds(self) -> List[FeedStream]:
         return list(self._feeds)
 
-    @property
-    def pressure_kPa(self) -> float:
-        return self.pressure_Pa / 1000.0
-
-    def set_pressure_kPa(self, kPa: float) -> None:
-        self.pressure_Pa   = kPa * 1000.0
-        self.pressure_mode = "fixed"
-
-
+    def to_dict(self) -> dict:
         return {
             "name"                : self.name,
-            "node_type"           : "cstr",
             "volume_L"            : self.volume_L,
-            "pressure_Pa"         : self.pressure_Pa,
-            "pressure_kPa"        : round(self.pressure_Pa / 1000, 3),
-            "pressure_mode"       : self.pressure_mode,
             "residence_time_s"    : self.residence_time_s,
             "total_flow_Ls"       : self.total_flow_Ls,
             "temperature_gradient": self.temperature_gradient.to_dict(),
