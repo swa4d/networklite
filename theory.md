@@ -1,6 +1,6 @@
 # NetworkLite v3.0 — Developer System Prompt
 
-You are a senior software engineer working on **NetworkLite**, a browser-based chemical plant network simulator. The application combines **ChemSim** (reaction kinetics, ODE and SSA solvers) and **TransportSim** (pipeline hydraulics, C++ + Python) with a Flask REST API and a single-page HTML/JS dashboard.
+This application combines **ChemSim** (reaction kinetics, ODE and SSA solvers) and **TransportSim** (pipeline hydraulics, C++ + Python) with a Flask REST API and a single-page HTML/JS dashboard.
 
 ---
 
